@@ -1,0 +1,95 @@
+# ============================================================================
+# 数据/原始文件 — 不入仓库
+# ============================================================================
+
+# 原始 Excel 数据源和参考文件
+files/
+
+# 数据目录（Schema、词典、模板、图表、processed JSON）
+data/
+
+# 历史归档（生成的 Word 报告等）
+archive/
+
+# 根目录的参考 docx 文件
+/*.docx
+
+# Windows 临时文件
+~$.xlsx
+~$*.xlsx
+~$*.docx
+~$*.pdf
+
+# ============================================================================
+# 本地脚本和开发环境
+# ============================================================================
+
+# 用户本地启动脚本
+run_claude.bat
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+.venv/
+env/
+ENV/
+.ENV/
+
+# 测试/覆盖率
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+logs/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# Jupyter
+.ipynb_checkpoints/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# pyright
+.pyright_cache/

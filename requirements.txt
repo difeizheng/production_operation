@@ -1,0 +1,20 @@
+# Core dependencies
+openpyxl>=3.1.2
+python-docx>=0.8.11
+docxtpl>=0.16.7
+Jinja2>=3.1.2
+
+# Data processing
+pandas>=2.0.0
+jsonschema>=4.18.0
+pydantic>=2.0.0
+
+# Chart generation
+matplotlib>=3.7.0
+
+# Testing
+pytest>=7.3.0
+pytest-cov>=4.1.0
+
+# Optional: LLM integration
+anthropic>=0.18.0
