@@ -1,0 +1,62 @@
+{
+  "report_id": "2026_W21_001",
+  "report_period": {
+    "year": 2026,
+    "week": 21,
+    "start_date": "2026-05-16",
+    "end_date": "2026-05-22"
+  },
+  "environmental_assets": {
+    "green_cert": {
+      "weekly_issued_wan": 12.4,
+      "weekly_sold_wan": 3.0,
+      "weekly_sold_count": 30000,
+      "weekly_avg_price": 4.5,
+      "by_year_weekly": {
+        "2025": {
+          "sold_wan": 2.9,
+          "sold_count": 29000,
+          "avg_price": 4.5
+        },
+        "2026": {
+          "sold_count": 472,
+          "avg_price": 8.1,
+          "mom_change_fen": -0.4
+        }
+      },
+      "yoy_cumulative": {
+        "sold_wan": 448.0,
+        "avg_price": 4.7
+      },
+      "inventory_wan": {
+        "2026": 330,
+        "2025": 767,
+        "2024": 66,
+        "total": 1163
+      },
+      "historical_prices": {
+        "2024_avg": 4.0,
+        "2025_avg": 4.5,
+        "2026_avg": 8.1
+      }
+    },
+    "ccer": {
+      "weekly_sold_tons": 2100,
+      "weekly_avg_price": 85,
+      "yoy_cumulative": {
+        "sold_wan_tons": 43.4,
+        "avg_price": 83.7
+      },
+      "inventory_wan_tons": 506
+    }
+  },
+  "verification": {
+    "green_cert_weekly_revenue_wan": 13.43,
+    "green_cert_yoy_cumulative_wan": 2105.6,
+    "green_cert_inventory_value_wan": 6388.5,
+    "ccer_weekly_revenue_wan": 17.85,
+    "ccer_yoy_cumulative_wan": 363.26,
+    "ccer_inventory_value_wan": 4301.0,
+    "total_inventory_value_wan": 10689.5
+  }
+}

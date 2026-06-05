@@ -280,7 +280,44 @@ def collect_all_sheets(file_path):
 | Phase 3 | ✅ 完成 | 100% | 用户文档：指南、API、验收 |
 | **Phase 1R** | ✅ 完成 | 95% | 数据源切换：综合分析报表采集器、CELL_MAP |
 | **Phase 2R** | ✅ 完成 | 85% | 模板重建：3表格、分析文本生成、完整结构 |
-| Phase 4 | 可选 | 0% | 智能能力：LLM、异常检测 |
+| **v2.0 Analyzer 层** | ✅ **完成** | **100%** | **4 Analyzer + 139 单元测试** |
+| **v2.0 Streamlit UI** | ✅ **完成** | **100%** | **5 页面 + 13 组件 + 集成测试** |
+
+## v2.0 架构新增内容
+
+### Analyzer 层（src/analyzer/）
+- `base.py` - BaseAnalyzer 抽象类 + AnalysisResult 数据类
+- `domestic.py` - 段 1-2（国内电量电价）— 35 测试
+- `international.py` - 段 3-4（国际电价同比环比）— 38 测试
+- `market_trading.py` - 段 5-7（水/新/火市场化）— 36 测试
+- `environmental.py` - 段 8（绿证+CCER）— 30 测试
+
+### Streamlit 应用（streamlit_app/）
+- `app.py` - 主入口（文件上传 + 4 Analyzer 工厂 + session_state）
+- `utils/data_loader.py` - 数据加载器
+- `components/` - 13 个复用组件（KPI/图表/表格/故事/通用渲染）
+- `pages/1-4` - 4 维度分析页面
+- `pages/5_📄_报告生成.py` - Markdown 报告导出
+
+### 测试
+- `tests/test_analyzer/test_*.py` - 139 单元测试
+- `tests/fixtures/*.json` - 4 维度 fixture + 1 合并 fixture
+- `examples/streamlit_*.py` - 5 集成测试 + AppTest 验证
+
+### 设计文档
+- `docs/design/business-map-master.md` - 业务图谱（5 总图）
+- `docs/design/report-generator-v2-architecture.md` - v2 架构设计
+- `docs/user_guide/weekly-report-beginner-guide.md` - 教学文档 v1.2
+- `docs/analysis/domestic-price-analysis-framework.md` - 工程框架 v1.2
+
+### 运行方式
+```bash
+# CLI
+PYTHONPATH=. python scripts/run_pipeline.py --week 21 --year 2026
+
+# Web UI
+PYTHONPATH=. streamlit run streamlit_app/app.py
+```
 
 ## Quick Commands (Updated)
 

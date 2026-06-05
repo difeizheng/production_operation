@@ -1,0 +1,27 @@
+# 周报自动化 v2 - Streamlit 应用依赖
+# 基于 docs/design/report-generator-v2-architecture.md 设计
+
+# === 核心框架 ===
+streamlit>=1.30.0          # Streamlit Web 框架
+
+# === 数据处理 ===
+pandas>=2.0.0              # 数据处理
+numpy>=1.24.0              # 数值计算
+openpyxl>=3.1.0            # Excel 读取
+
+# === 图表可视化 ===
+plotly>=5.17.0             # 交互式图表（Streamlit 原生支持）
+altair>=5.0.0              # 备选图表库
+matplotlib>=3.7.0          # 静态图表
+
+# === Word 报告生成（Phase 5 优化）===
+python-docx>=1.0.0         # Word 文档生成
+docxtpl>=0.18.0            # Word 模板引擎
+
+# === 工具库 ===
+pyyaml>=6.0                # YAML 配置
+jsonschema>=4.20.0         # JSON Schema 校验
+
+# === 已有依赖（继承 v1） ===
+# 这些依赖来自 requirements.txt（项目根目录）
+# 运行时会自动继承

@@ -1,0 +1,129 @@
+{
+  "report_id": "2026_W21_001",
+  "report_period": {
+    "year": 2026,
+    "week": 21,
+    "start_date": "2026-05-16",
+    "end_date": "2026-05-22"
+  },
+  "market_trading": {
+    "hydro": {
+      "avg_price_yuan_per_kwh": 0.304,
+      "yoy_price_change_fen": 1.3,
+      "mom_price_change_fen": -0.35,
+      "yoy_volume_yi_kwh": 9.5,
+      "mom_volume_yi_kwh": 9.7,
+      "yoy_revenue_yi_yuan": 28.9,
+      "mom_revenue_yi_yuan": 29.5,
+      "spot_income_fen": 0.37,
+      "spot_income_fen_last_week": 0.75,
+      "spot_income_yi": 0.0534,
+      "spot_income_yi_last_week": 0.112,
+      "spot_volume_yi_kwh": 9.7,
+      "spot_volume_xiluodu_yi_kwh": 6.5,
+      "spot_volume_wudongde_yi_kwh": 3.2,
+      "spot_price_yuan": 0.30,
+      "spot_price_xiluodu_yuan": 0.312,
+      "spot_price_wudongde_yuan": 0.277,
+      "spot_premium_fen": 0.6,
+      "spot_premium_xiluodu_fen": 0.7,
+      "spot_premium_wudongde_fen": 0.2,
+      "d2_increment_yi_kwh": 0.006,
+      "participation_markets": ["国网跨省跨区中长期", "南网跨省跨区中长期", "南方区域现货市场"]
+    },
+    "renewables": {
+      "avg_price_yuan_per_kwh": 0.266,
+      "yoy_price_change_fen": -1.6,
+      "mom_price_change_fen": 1.3,
+      "yoy_volume_yi_kwh": 17.5,
+      "mom_volume_yi_kwh": 18.0,
+      "yoy_revenue_yi_yuan": 4.6,
+      "mom_revenue_yi_yuan": 4.8,
+      "provinces_count": 28,
+      "spot_provinces_count": 23,
+      "full_market_entry": true,
+      "by_province_yoy": {
+        "qinghai": {
+          "yoy_change_fen": -3.4,
+          "reason": "供需宽松 + 去年无现货今年有"
+        },
+        "xinjiang": {
+          "yoy_change_fen": -11.0,
+          "reason": "供需宽松 + 外送价格走低"
+        }
+      },
+      "by_province_mom": {
+        "shandong": {
+          "name": "山东",
+          "mom_change_fen": 4.6,
+          "long_term_position_pct": 0,
+          "spot_price_yuan": 0.333,
+          "spot_mom_change_fen": 3.1,
+          "strategy": "low_holding_aggressive",
+          "strategy_type": "进攻型",
+          "trigger": "阴雨→光伏少→现货价高"
+        },
+        "hubei": {
+          "name": "湖北",
+          "mom_change_fen": 1.2,
+          "long_term_position_pct": 95,
+          "spot_price_yuan": 0.171,
+          "long_term_price_yuan": 0.35,
+          "strategy": "high_holding_defensive",
+          "strategy_type": "防守型",
+          "trigger": "阴雨→水电多→现货价跌"
+        },
+        "shaanxi": {
+          "name": "陕西",
+          "mom_change_fen": 0.6,
+          "long_term_position_change": "120% → 105%",
+          "spot_price_yuan": 0.182,
+          "spot_mom_change_fen": 1.0,
+          "strategy": "regulatory_line_play",
+          "strategy_type": "规则型",
+          "trigger": "105% 卡线规则"
+        }
+      }
+    },
+    "thermal": {
+      "avg_price_yuan_per_kwh": 0.402,
+      "yoy_price_change_fen": -2.8,
+      "mom_price_change_fen": 4.6,
+      "yoy_volume_yi_kwh": 3.5,
+      "mom_volume_yi_kwh": 3.1,
+      "yoy_revenue_yi_yuan": 1.5,
+      "mom_revenue_yi_yuan": 1.25,
+      "long_term_price_yuan": 0.39,
+      "long_term_yoy_change_fen": -3.0,
+      "spot_price_yuan": 0.1710,
+      "spot_price_last_week_yuan": 0.2503,
+      "spot_decline_pct": -31.71,
+      "only_coal_in_market": true,
+      "participation_markets": ["湖北现货市场"],
+      "units_operating": ["鄂州#2", "鄂州#3", "鄂州#6", "宜城#2"],
+      "three_layer_attribution": {
+        "long_term_effect_fen": -3.0,
+        "spot_effect_fen": 0.0,
+        "capacity_fee_effect_fen": 0.2,
+        "net_effect_fen": -2.8
+      },
+      "system_data": {
+        "system_load_change_wan_kw": 11,
+        "wind_nm_change_wan_kw": 24,
+        "solar_change_wan_kw": -326
+      }
+    }
+  },
+  "three_boards_comparison": {
+    "yoy": {
+      "hydro": 1.3,
+      "renewables": -1.6,
+      "thermal": -2.8
+    },
+    "mom": {
+      "hydro": -0.35,
+      "renewables": 1.3,
+      "thermal": 4.6
+    }
+  }
+}
