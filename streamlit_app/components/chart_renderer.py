@@ -119,7 +119,12 @@ def _render_line(data: dict, title: str) -> go.Figure:
 
 
 def render_charts(charts_data: list, key_prefix: str = "chart"):
-    """批量渲染多个图表"""
+    """批量渲染多个图表
+
+    Args:
+        charts_data: 图表数据列表
+        key_prefix: key 前缀（默认 "chart"），同一页面多次调用时传入不同前缀避免冲突
+    """
     if not charts_data:
         st.info("暂无图表数据")
         return

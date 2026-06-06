@@ -22,13 +22,15 @@ from .table_renderer import render_tables
 from .story_panel import render_story, render_summary, render_anomalies, render_insights
 
 
-def render_analyzer_result(result, dimension_label: str = None, show_kpis: bool = True):
+def render_analyzer_result(result, dimension_label: str = None, show_kpis: bool = True, key_prefix: str = ""):
     """渲染完整的 AnalysisResult
 
     Args:
         result: src.analyzer.base.AnalysisResult 实例
         dimension_label: 维度标签（可选）
         show_kpis: 是否显示 KPI 网格
+        key_prefix: Streamlit chart key 前缀（同一页面多次调用时用，避免 chart key 冲突）。
+                    仅影响 chart 渲染（实际冲突源），其他元素无 key 冲突。
     """
     if result is None:
         st.error("❌ Analyzer 结果为空")
@@ -70,11 +72,12 @@ def render_analyzer_result(result, dimension_label: str = None, show_kpis: bool 
         st.markdown("### 📋 数据明细")
         render_tables(result.tables)
 
-    # 7. 图表
+    # 7. 图表（key 冲突源：用 key_prefix 区分）
     if result.charts:
         st.markdown("---")
         st.markdown("### 📊 可视化")
-        render_charts(result.charts)
+        chart_key_prefix = f"{key_prefix}chart" if key_prefix else "chart"
+        render_charts(result.charts, key_prefix=chart_key_prefix)
 
     # 8. 关键洞察
     if result.insights:

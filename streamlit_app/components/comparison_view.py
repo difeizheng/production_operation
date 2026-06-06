@@ -68,6 +68,7 @@ def render_dual_comparison(
     full_label: str = "🏠 全口径",
     market_label: str = "💹 市场化",
     plotly_specs: dict = None,
+    kpi_map: dict = None,
 ):
     """渲染完整的双口径对比视图
 
@@ -77,23 +78,28 @@ def render_dual_comparison(
         full_label: 第一个结果的标签
         market_label: 第二个结果的标签
         plotly_specs: Plotly 图表规范（来自 dual_volume_plotly_specs.json）
+        kpi_map: KPI 字段映射（v2.4 兼容：默认用国内映射）
     """
     if not full_result or not market_result:
         st.error("❌ 需要 2 个 AnalysisResult 才能对比")
         return
 
+    # 默认用国内映射（向后兼容）
+    if kpi_map is None:
+        kpi_map = DOMESTIC_KPI_MAP
+
     # === 1. 顶部 KPI 对比卡片 ===
-    _render_kpi_comparison(full_result, market_result, full_label, market_label)
+    _render_kpi_comparison(full_result, market_result, full_label, market_label, kpi_map)
 
     st.markdown("---")
 
     # === 2. 关键对比指标表 ===
-    _render_comparison_table(full_result, market_result, full_label, market_label)
+    _render_comparison_table(full_result, market_result, full_label, market_label, kpi_map)
 
     st.markdown("---")
 
     # === 3. 5 大品类对比 ===
-    _render_category_comparison(full_result, market_result, full_label, market_label)
+    _render_category_comparison(full_result, market_result, full_label, market_label, kpi_map)
 
     st.markdown("---")
 
@@ -154,20 +160,20 @@ def _render_kpi_comparison(full, market, full_label, market_label, kpi_map):
         st.metric(
             "同比电量 差异",
             f"{f.get(k_yoy_vol, 0):+.2f}%",
-            delta=f"{market.get(k_yoy_vol, 0)-f.get(k_yoy_vol, 0):+.2f} pp",
+            delta=f"{m.get(k_yoy_vol, 0)-f.get(k_yoy_vol, 0):+.2f} pp",
             delta_color="inverse",
         )
     with cols2[1]:
         st.metric(
             "同比度电 差异",
             f"{f.get(k_yoy_price, 0):+.1f} 分",
-            delta=f"{market.get(k_yoy_price, 0)-f.get(k_yoy_price, 0):+.1f} 分",
+            delta=f"{m.get(k_yoy_price, 0)-f.get(k_yoy_price, 0):+.1f} 分",
         )
     with cols2[2]:
         st.metric(
             "同比收入 差异",
             f"{f.get(k_yoy_rev, 0):+.2f}%",
-            delta=f"{market.get(k_yoy_rev, 0)-f.get(k_yoy_rev, 0):+.2f} pp",
+            delta=f"{m.get(k_yoy_rev, 0)-f.get(k_yoy_rev, 0):+.2f} pp",
             delta_color="inverse",
         )
     with cols2[3]:
@@ -218,7 +224,7 @@ def _render_comparison_table(full, market, full_label, market_label, kpi_map):
     st.dataframe(df, use_container_width=True, hide_index=True)
 
 
-def _render_category_comparison(full, market, full_label, market_label):
+def _render_category_comparison(full, market, full_label, market_label, kpi_map):
     """5 大品类对比"""
     st.markdown("### 📊 5 大品类同比收入对比")
 
