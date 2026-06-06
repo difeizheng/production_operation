@@ -1,11 +1,14 @@
 """
-Streamlit Page 2: 🌍 国际分析（支持 3 模式切换）
+Streamlit Page 2: 🌍 国际分析（支持 4 模式切换）
 ==========================================
 
 v2.2 新增：3 模式切换器
 - 🌍 国际全口径：完整 InternationalAnalyzer 渲染（默认）
 - 💹 国际化市场：单独渲染市场化部分
 - 🆚 国际双口径对比：用 6 个 Plotly 图对比
+
+v2.3 新增：第 4 模式
+- 🏢 按公司拆分：3 家公司横向对比（三峡国际 / 长江电力 / 湖北能源）
 
 对应业务图谱: 段 3-4 (国际电价同比 + 环比)
 对应 Analyzer: InternationalAnalyzer
@@ -31,6 +34,7 @@ st.set_page_config(
 from streamlit_app.components import (
     render_analyzer_result,
     render_dual_comparison,
+    render_by_company,
     load_plotly_specs,
 )
 from src.analyzer import InternationalAnalyzer
@@ -46,10 +50,11 @@ mode = st.radio(
         "🌍 国际全口径（默认）",
         "💹 国际化市场（49% 风险敞口）",
         "🆚 国际双口径对比",
+        "🏢 按公司拆分",
     ],
     index=0,
     horizontal=True,
-    help="国际全口径=集团整体海外业务；国际化市场=短期博弈；对比=看 1 个故事",
+    help="国际全口径=集团整体海外业务；国际化市场=短期博弈；对比=看 1 个故事；按公司=看子公司贡献",
 )
 
 st.markdown("---")
@@ -70,6 +75,16 @@ def load_full_intl_data():
 def load_market_intl_data():
     """加载国际化市场数据"""
     path = project_root / "tests" / "fixtures" / "international_market_volume_w21.json"
+    if path.exists():
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+
+@st.cache_data
+def load_intl_by_company_data():
+    """加载国际按公司数据"""
+    path = project_root / "tests" / "fixtures" / "international_by_company_w21.json"
     if path.exists():
         with open(path, encoding="utf-8") as f:
             return json.load(f)
@@ -158,11 +173,32 @@ elif mode == "🆚 国际双口径对比":
         kpi_map_name="国际",  # 关键：使用国际 kpi 字段名
     )
 
+elif mode == "🏢 按公司拆分":
+    data = load_intl_by_company_data()
+    if not data:
+        st.error("❌ 国际按公司数据未找到")
+        st.stop()
+
+    st.info("""
+    🏢 **国际按公司拆分模式**：
+    - 集团国际 3 家单位横向对比
+    - 三峡国际 / 长江电力（长电国际） / 湖北能源
+    - 看 1 个故事：**三峡国际独大 + 长江电力双布局**
+    - 详见：`docs/analysis/by-company-13-insights.md`
+    """)
+
+    render_by_company(
+        companies=data["companies"],
+        context="国际",
+        title="🏢 国际各单位数据（3 家）",
+    )
+
 
 # === 底部文档链接 ===
 st.caption("""
 📖 详细文档:
 - `docs/analysis/domestic-price-analysis-framework.md` 第 15 节
+- `docs/analysis/by-company-13-insights.md` 按公司 13 洞察
 - `docs/user_guide/weekly-report-beginner-guide.md` 第八部分
 - `docs/design/business-map-master.md` 业务图谱
 """)

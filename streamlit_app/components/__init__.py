@@ -9,9 +9,10 @@ Streamlit 复用组件包
 - story_panel: 业务故事/总结/异常/洞察
 - analyzer_panel: 通用 AnalysisResult 渲染器（核心）
 - comparison_view: 双口径对比视图（v2.1 新增，v2.2 支持国内/国际）
+- unit_view: 按公司拆分视图（v2.3 新增）
 """
 
-__version__ = "2.2.0-phase5"
+__version__ = "2.3.0-phase5"
 
 from .kpi_card import kpi_card, kpi_grid, kpi_row
 from .chart_renderer import render_chart, render_charts, render_simple_bar
@@ -25,6 +26,7 @@ from .comparison_view import (
     DOMESTIC_KPI_MAP,
     INTERNATIONAL_KPI_MAP,
 )
+from .unit_view import render_by_company
 
 __all__ = [
     # KPI
@@ -52,4 +54,6 @@ __all__ = [
     "KPI_MAPS",
     "DOMESTIC_KPI_MAP",
     "INTERNATIONAL_KPI_MAP",
+    # 按公司视图（v2.3）
+    "render_by_company",
 ]

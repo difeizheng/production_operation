@@ -1,0 +1,56 @@
+{
+  "_meta": {
+    "source": "5/22 周报 - 国内各单位水电数据",
+    "unit_conversion": "原单位: 万 kWh / 元/度 / 万元 → 转换: 亿 kWh (÷10000)",
+    "note": "国内 4 家公司按周度对比，长江电力一家独大"
+  },
+  "report_id": "2026_W21_001",
+  "report_period": {
+    "year": 2026,
+    "week": 21,
+    "start_date": "2026-05-16",
+    "end_date": "2026-05-22"
+  },
+  "companies": [
+    {
+      "name": "长江电力",
+      "volume": 55.05,
+      "share_pct": 93.24,
+      "price": 0.271,
+      "yoy_volume_pct": -1.2,
+      "yoy_price_fen": -0.3,
+      "yoy_revenue_pct": -0.5,
+      "anomaly": null
+    },
+    {
+      "name": "三峡建工",
+      "volume": 0.58,
+      "share_pct": 0.99,
+      "price": 0.930,
+      "yoy_volume_pct": 5.0,
+      "yoy_price_fen": 1.2,
+      "yoy_revenue_pct": 8.5,
+      "anomaly": "单价异常"
+    },
+    {
+      "name": "湖北能源",
+      "volume": 3.41,
+      "share_pct": 5.77,
+      "price": 0.371,
+      "yoy_volume_pct": 105.21,
+      "yoy_price_fen": -2.5,
+      "yoy_revenue_pct": 98.6,
+      "anomaly": "暴增"
+    },
+    {
+      "name": "三峡发展",
+      "volume": 0.0024,
+      "share_pct": 0.00,
+      "price": 0.235,
+      "yoy_volume_pct": 0.0,
+      "yoy_price_fen": 0.0,
+      "yoy_revenue_pct": 0.0,
+      "anomaly": null
+    }
+  ]
+}

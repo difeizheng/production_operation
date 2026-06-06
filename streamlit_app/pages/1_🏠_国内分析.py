@@ -1,11 +1,14 @@
 """
-Streamlit Page 1: 🏠 国内分析（支持 3 模式切换）
+Streamlit Page 1: 🏠 国内分析（支持 4 模式切换）
 ==========================================
 
 v2.1 新增：3 模式切换器
 - 🏠 全口径：完整 DomesticAnalyzer 渲染（默认）
 - 💹 市场化：单独渲染市场化部分
 - 🆚 双口径对比：用 6 个 Plotly 图对比
+
+v2.3 新增：第 4 模式
+- 🏢 按公司拆分：4 家公司横向对比
 
 对应业务图谱: 段 1-2 (国内电量 + 国内电价)
 对应 Analyzer: DomesticAnalyzer
@@ -31,6 +34,7 @@ st.set_page_config(
 from streamlit_app.components import (
     render_analyzer_result,
     render_dual_comparison,
+    render_by_company,
     load_plotly_specs,
 )
 from src.analyzer import DomesticAnalyzer
@@ -46,10 +50,11 @@ mode = st.radio(
         "🏠 全口径（默认）",
         "💹 市场化（41% 风险敞口）",
         "🆚 双口径对比",
+        "🏢 按公司拆分",
     ],
     index=0,
     horizontal=True,
-    help="全口径=集团整体；市场化=短期博弈；对比=看 1 个故事",
+    help="全口径=集团整体；市场化=短期博弈；对比=看 1 个故事；按公司=看子公司贡献",
 )
 
 st.markdown("---")
@@ -70,6 +75,16 @@ def load_full_data():
 def load_market_data():
     """加载市场化数据"""
     path = project_root / "tests" / "fixtures" / "domestic_market_volume_w21.json"
+    if path.exists():
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+
+@st.cache_data
+def load_by_company_data():
+    """加载按公司数据"""
+    path = project_root / "tests" / "fixtures" / "domestic_by_company_w21.json"
     if path.exists():
         with open(path, encoding="utf-8") as f:
             return json.load(f)
@@ -146,11 +161,32 @@ elif mode == "🆚 双口径对比":
         plotly_specs=plotly_specs,
     )
 
+elif mode == "🏢 按公司拆分":
+    data = load_by_company_data()
+    if not data:
+        st.error("❌ 按公司数据未找到")
+        st.stop()
+
+    st.info("""
+    🏢 **按公司拆分模式**：
+    - 集团国内 4 家单位横向对比
+    - 长江电力 / 三峡建工 / 湖北能源 / 三峡发展
+    - 看 1 个故事：**单家独大 + 异常公司识别**
+    - 详见：`docs/analysis/by-company-13-insights.md`
+    """)
+
+    render_by_company(
+        companies=data["companies"],
+        context="国内",
+        title="🏢 国内各单位水电数据（4 家）",
+    )
+
 
 # === 底部文档链接 ===
 st.caption("""
 📖 详细文档:
 - `docs/analysis/domestic-price-analysis-framework.md` 第 1-14 节
+- `docs/analysis/by-company-13-insights.md` 按公司 13 洞察
 - `docs/user_guide/weekly-report-beginner-guide.md` 第五部分
 - `docs/design/business-map-master.md` 业务图谱
 """)

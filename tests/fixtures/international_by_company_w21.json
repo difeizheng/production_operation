@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "source": "5/22 周报 - 国际各单位数据",
+    "unit_conversion": "原单位: 万 kWh / 元/度 / 万元 → 转换: 亿 kWh (÷10000)",
+    "note": "国际 3 家公司，三峡国际一家独大（与国内结构类似）"
+  },
+  "report_id": "2026_W21_001",
+  "report_period": {
+    "year": 2026,
+    "week": 21,
+    "start_date": "2026-05-16",
+    "end_date": "2026-05-22"
+  },
+  "companies": [
+    {
+      "name": "三峡国际",
+      "volume": 8.12,
+      "share_pct": 92.31,
+      "price": 0.318,
+      "yoy_volume_pct": 2.5,
+      "yoy_price_fen": 3.5,
+      "yoy_revenue_pct": 16.5,
+      "anomaly": null
+    },
+    {
+      "name": "长江电力",
+      "volume": 0.28,
+      "share_pct": 3.18,
+      "price": 0.585,
+      "yoy_volume_pct": 0.0,
+      "yoy_price_fen": 0.0,
+      "yoy_revenue_pct": 0.0,
+      "anomaly": null
+    },
+    {
+      "name": "湖北能源",
+      "volume": 0.40,
+      "share_pct": 4.51,
+      "price": 0.173,
+      "yoy_volume_pct": 0.0,
+      "yoy_price_fen": 0.0,
+      "yoy_revenue_pct": 0.0,
+      "anomaly": null
+    }
+  ]
+}
