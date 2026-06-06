@@ -129,6 +129,39 @@ def _analyzer_overall_18() -> list:
     return result.tables
 
 
+def _build_overall_vs_market_table(overall_data: dict, market_data: dict) -> "pd.DataFrame":
+    """构建 18 组织 × 双口径完整对比表
+
+    列：组织 | 业务桶 | 整体电量 | 整体电价 | 整体电费 | 市场化率 | 市场化电量 | 市场化电价 | 市场化电费 | 电价差
+    """
+    import pandas as pd
+    rows = []
+    for name, ov in overall_data["by_organization"].items():
+        mkt = market_data["by_organization"].get(name, {})
+        ov_vol = ov.get("overall_volume_wk", 0)
+        mkt_vol = mkt.get("market_volume_wk", 0)
+        market_rate = (mkt_vol / ov_vol * 100) if ov_vol > 0 else 0.0
+        ov_price = ov.get("overall_price_wk", 0)
+        mkt_price = mkt.get("market_price_wk", 0)
+        price_diff = mkt_price - ov_price
+
+        rows.append({
+            "组织": name,
+            "业务桶": ov.get("category", "—"),
+            "整体电量(万kWh)": round(ov_vol, 2),
+            "整体电价(元/度)": round(ov_price, 3),
+            "整体电费(万元)": round(ov.get("overall_revenue_wk", 0), 2),
+            "市场化率(%)": round(market_rate, 2),
+            "市场化电量(万kWh)": round(mkt_vol, 2),
+            "市场化电价(元/度)": round(mkt_price, 3),
+            "市场化电费(万元)": round(mkt.get("market_revenue_wk", 0), 2),
+            "电价差(元/度)": round(price_diff, 4),
+        })
+    df = pd.DataFrame(rows)
+    # 按市场化率降序
+    return df.sort_values("市场化率(%)", ascending=False).reset_index(drop=True)
+
+
 # ============================================================
 # 数据加载函数
 # ============================================================
@@ -328,15 +361,27 @@ elif COMBO_ID == "🏠 整体销售|🏢 按公司拆分":
     with tab2:
         st.info("""
         📋 **18 家全量**（v2.4 新）
-        - 完整覆盖集团所有组织
-        - 按业务模式自然分组
+        - 完整覆盖集团所有组织（6 直属 + 12 分公司）
+        - 同时展示整体销售 + 市场化双口径
         """)
         if overall_v24 and market_v24:
             market_dim = build_market_dimension(overall_v24, market_v24)
-            from streamlit_app.components import render_tables
-            for table in [t for t in _analyzer_overall_18() if "组织" in t.get("title", "")]:
-                from streamlit_app.components import render_table
-                render_table(table)
+
+            # 1. 18 组织 × 双口径 完整对比表
+            st.markdown("#### 📊 18 组织 × 双口径完整对比")
+            st.dataframe(_build_overall_vs_market_table(overall_v24, market_v24), use_container_width=True, hide_index=True)
+
+            # 2. 4 象限分布（v2.4 核心）
+            st.markdown("---")
+            st.markdown("#### 🎯 18 组织市场化维度（v2.4）")
+            render_org_quadrant_distribution(market_dim)
+
+            # 3. 2 个关键图：市场化率排行 + 电价差
+            st.markdown("---")
+            st.markdown("#### 📈 关键可视化")
+            render_market_rate_ranking(market_dim, top_n=18)
+        else:
+            st.error("❌ v2.4 数据未找到")
 
     with tab3:
         st.info("""
