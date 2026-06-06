@@ -26,6 +26,42 @@ COLOR_DIFF = "#2ca02c"          # 绿色 - 差异
 COLOR_WARN = "#d62728"          # 红色 - 警告
 
 
+# === KPI 字段映射（支持国内/国际） ===
+
+DOMESTIC_KPI_MAP = {
+    "总电量": "国内上网电量",
+    "度电均价": "国内度电均价",
+    "总电费": "国内发电收入",
+    "同比电量": "同比电量",
+    "同比度电": "同比度电",
+    "同比收入": "同比收入",
+    "环比电量": "环比电量",
+    "环比度电": "环比度电",
+    "总电量单位": "亿度",
+    "度电单位": "元/度",
+    "电费单位": "亿元",
+}
+
+INTERNATIONAL_KPI_MAP = {
+    "总电量": "国际上网电量",
+    "度电均价": "国际度电均价",
+    "总电费": "国际发电收入",
+    "同比电量": "国际同比电量",
+    "同比度电": "国际同比度电",
+    "同比收入": "国际同比收入",
+    "环比电量": "国际环比电量",
+    "环比度电": "国际环比度电",
+    "总电量单位": "亿度",
+    "度电单位": "元/度",
+    "电费单位": "亿元",
+}
+
+KPI_MAPS = {
+    "国内": DOMESTIC_KPI_MAP,
+    "国际": INTERNATIONAL_KPI_MAP,
+}
+
+
 def render_dual_comparison(
     full_result: Any,
     market_result: Any,
@@ -70,93 +106,112 @@ def render_dual_comparison(
     _render_comparison_insights(full_result, market_result, full_label, market_label)
 
 
-def _render_kpi_comparison(full, market, full_label, market_label):
+def _render_kpi_comparison(full, market, full_label, market_label, kpi_map):
     """顶部 8 个 KPI 对比卡片"""
     st.markdown("### 🎯 8 大核心指标对比")
 
     f = full.kpis
     m = market.kpis
 
+    k_total_vol = kpi_map["总电量"]
+    k_price = kpi_map["度电均价"]
+    k_revenue = kpi_map["总电费"]
+    k_yoy_vol = kpi_map["同比电量"]
+    k_yoy_price = kpi_map["同比度电"]
+    k_yoy_rev = kpi_map["同比收入"]
+    u_vol = kpi_map["总电量单位"]
+    u_price = kpi_map["度电单位"]
+    u_rev = kpi_map["电费单位"]
+
     # 4 列 2 行
     cols1 = st.columns(4)
     with cols1[0]:
         st.metric(
             f"{full_label} 总电量",
-            f"{f.get('国内上网电量', 0)} 亿度",
+            f"{f.get(k_total_vol, 0)} {u_vol}",
             help="本周度电总量"
         )
     with cols1[1]:
         st.metric(
             f"{market_label} 总电量",
-            f"{m.get('国内上网电量', 0)} 亿度",
-            delta=f"{m.get('国内上网电量', 0)/f.get('国内上网电量', 1)*100:.1f}% of {full_label}",
+            f"{m.get(k_total_vol, 0)} {u_vol}",
+            delta=f"{m.get(k_total_vol, 0)/f.get(k_total_vol, 1)*100:.1f}% of {full_label}",
         )
     with cols1[2]:
         st.metric(
             f"{full_label} 度电均价",
-            f"{f.get('国内度电均价', 0)} 元",
+            f"{f.get(k_price, 0)} {u_price}",
         )
     with cols1[3]:
         st.metric(
             f"{market_label} 度电均价",
-            f"{m.get('国内度电均价', 0)} 元",
-            delta=f"{m.get('国内度电均价', 0)-f.get('国内度电均价', 0):+.3f}",
+            f"{m.get(k_price, 0)} {u_price}",
+            delta=f"{m.get(k_price, 0)-f.get(k_price, 0):+.3f}",
         )
 
     cols2 = st.columns(4)
     with cols2[0]:
         st.metric(
             "同比电量 差异",
-            f"{f.get('同比电量', 0):+.2f}%",
-            delta=f"{market.get('同比电量', 0)-f.get('同比电量', 0):+.2f} pp",
+            f"{f.get(k_yoy_vol, 0):+.2f}%",
+            delta=f"{market.get(k_yoy_vol, 0)-f.get(k_yoy_vol, 0):+.2f} pp",
             delta_color="inverse",
         )
     with cols2[1]:
         st.metric(
             "同比度电 差异",
-            f"{f.get('同比度电', 0):+.1f} 分",
-            delta=f"{market.get('同比度电', 0)-f.get('同比度电', 0):+.1f} 分",
+            f"{f.get(k_yoy_price, 0):+.1f} 分",
+            delta=f"{market.get(k_yoy_price, 0)-f.get(k_yoy_price, 0):+.1f} 分",
         )
     with cols2[2]:
         st.metric(
             "同比收入 差异",
-            f"{f.get('同比收入', 0):+.2f}%",
-            delta=f"{market.get('同比收入', 0)-f.get('同比收入', 0):+.2f} pp",
+            f"{f.get(k_yoy_rev, 0):+.2f}%",
+            delta=f"{market.get(k_yoy_rev, 0)-f.get(k_yoy_rev, 0):+.2f} pp",
             delta_color="inverse",
         )
     with cols2[3]:
         st.metric(
             "总电费 市场化占比",
-            f"{m.get('国内发电收入', 0)/f.get('国内发电收入', 1)*100:.1f}%",
+            f"{m.get(k_revenue, 0)/f.get(k_revenue, 1)*100:.1f}%",
         )
 
 
-def _render_comparison_table(full, market, full_label, market_label):
+def _render_comparison_table(full, market, full_label, market_label, kpi_map):
     """关键对比指标表"""
     st.markdown("### 📋 关键指标对比表")
 
     f = full.kpis
     m = market.kpis
 
+    k_total_vol = kpi_map["总电量"]
+    k_price = kpi_map["度电均价"]
+    k_revenue = kpi_map["总电费"]
+    k_yoy_vol = kpi_map["同比电量"]
+    k_yoy_price = kpi_map["同比度电"]
+    k_yoy_rev = kpi_map["同比收入"]
+    k_mom_vol = kpi_map["环比电量"]
+    k_mom_price = kpi_map["环比度电"]
+
     import pandas as pd
 
     rows = [
-        ["总电量 (亿度)", f"{f.get('国内上网电量', 0)}", f"{m.get('国内上网电量', 0)}",
-         f"{m.get('国内上网电量', 0)/f.get('国内上网电量', 1)*100:.1f}%"],
-        ["度电均价 (元)", f"{f.get('国内度电均价', 0):.3f}", f"{m.get('国内度电均价', 0):.3f}",
-         f"{m.get('国内度电均价', 0)-f.get('国内度电均价', 0):+.3f}"],
-        ["总电费 (亿元)", f"{f.get('国内发电收入', 0):.2f}", f"{m.get('国内发电收入', 0):.2f}",
-         f"{m.get('国内发电收入', 0)/f.get('国内发电收入', 1)*100:.1f}%"],
-        ["同比电量", f"{f.get('同比电量', 0):+.2f}%", f"{m.get('同比电量', 0):+.2f}%",
-         f"{m.get('同比电量', 0)-f.get('同比电量', 0):+.2f} pp"],
-        ["同比度电 (分)", f"{f.get('同比度电', 0):+.1f}", f"{m.get('同比度电', 0):+.1f}",
-         f"{m.get('同比度电', 0)-f.get('同比度电', 0):+.1f}"],
-        ["同比收入", f"{f.get('同比收入', 0):+.2f}%", f"{m.get('同比收入', 0):+.2f}%",
-         f"{m.get('同比收入', 0)-f.get('同比收入', 0):+.2f} pp"],
-        ["环比电量", f"{f.get('环比电量', 0):+.2f}%", f"{m.get('环比电量', 0):+.2f}%",
-         f"{m.get('环比电量', 0)-f.get('环比电量', 0):+.2f} pp"],
-        ["环比度电 (分)", f"{f.get('环比度电', 0):+.1f}", f"{m.get('环比度电', 0):+.1f}",
-         f"{m.get('环比度电', 0)-f.get('环比度电', 0):+.1f}"],
+        [f"总电量 ({kpi_map['总电量单位']})", f"{f.get(k_total_vol, 0)}", f"{m.get(k_total_vol, 0)}",
+         f"{m.get(k_total_vol, 0)/f.get(k_total_vol, 1)*100:.1f}%"],
+        [f"度电均价 ({kpi_map['度电单位']})", f"{f.get(k_price, 0):.3f}", f"{m.get(k_price, 0):.3f}",
+         f"{m.get(k_price, 0)-f.get(k_price, 0):+.3f}"],
+        [f"总电费 ({kpi_map['电费单位']})", f"{f.get(k_revenue, 0):.2f}", f"{m.get(k_revenue, 0):.2f}",
+         f"{m.get(k_revenue, 0)/f.get(k_revenue, 1)*100:.1f}%"],
+        ["同比电量", f"{f.get(k_yoy_vol, 0):+.2f}%", f"{m.get(k_yoy_vol, 0):+.2f}%",
+         f"{m.get(k_yoy_vol, 0)-f.get(k_yoy_vol, 0):+.2f} pp"],
+        ["同比度电 (分)", f"{f.get(k_yoy_price, 0):+.1f}", f"{m.get(k_yoy_price, 0):+.1f}",
+         f"{m.get(k_yoy_price, 0)-f.get(k_yoy_price, 0):+.1f}"],
+        ["同比收入", f"{f.get(k_yoy_rev, 0):+.2f}%", f"{m.get(k_yoy_rev, 0):+.2f}%",
+         f"{m.get(k_yoy_rev, 0)-f.get(k_yoy_rev, 0):+.2f} pp"],
+        ["环比电量", f"{f.get(k_mom_vol, 0):+.2f}%", f"{m.get(k_mom_vol, 0):+.2f}%",
+         f"{m.get(k_mom_vol, 0)-f.get(k_mom_vol, 0):+.2f} pp"],
+        ["环比度电 (分)", f"{f.get(k_mom_price, 0):+.1f}", f"{m.get(k_mom_price, 0):+.1f}",
+         f"{m.get(k_mom_price, 0)-f.get(k_mom_price, 0):+.1f}"],
     ]
 
     df = pd.DataFrame(rows, columns=["指标", full_label, market_label, "差异"])
@@ -197,13 +252,74 @@ def _render_category_comparison(full, market, full_label, market_label):
     ])
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-    # 关键洞察：标记"倒挂"现象
-    st.info("""
-    💡 **关键观察**：
-    - **水电倒挂**: 市场化水电度电（0.304）> 全口径（0.283），现货市场水电能卖更贵
-    - **风电双增**: 市场化 +52.38% > 全口径 +11.79%，风电是市场化赢家
-    - **火电同步退场**: 全口径 -37.55% ≈ 市场化 -34.89%，两腿都短
-    """)
+    # 动态生成品类洞察（基于实际数据）
+    insights = _generate_category_insights(f_cats, m_cats, full_label, market_label)
+    if insights:
+        st.info("\n".join(insights))
+
+
+def _generate_category_insights(f_cats, m_cats, full_label, market_label):
+    """根据实际数据动态生成品类洞察"""
+    insights = []
+
+    # 检查水电倒挂
+    if "hydro" in f_cats and "hydro" in m_cats:
+        f_hydro_price = f_cats["hydro"].get("度电(元)", 0)
+        m_hydro_price = m_cats["hydro"].get("度电(元)", 0)
+        if m_hydro_price > f_hydro_price:
+            diff_fen = (m_hydro_price - f_hydro_price) * 100
+            insights.append(
+                f"💡 **关键观察 1 - 水电倒挂**: {market_label}水电度电（{m_hydro_price:.3f}）> {full_label}（{f_hydro_price:.3f}），现货市场水电能卖更贵（+{diff_fen:.1f}分）"
+            )
+
+    # 检查风电双增
+    if "wind" in f_cats and "wind" in m_cats:
+        f_wind_rev = f_cats["wind"].get("同比收入(%)", 0)
+        m_wind_rev = m_cats["wind"].get("同比收入(%)", 0)
+        if m_wind_rev > f_wind_rev * 1.5 and m_wind_rev > 0:
+            ratio = m_wind_rev / f_wind_rev if f_wind_rev > 0 else 0
+            insights.append(
+                f"💡 **关键观察 2 - 风电双增**: {market_label}同比 {m_wind_rev:+.1f}% > {full_label} {f_wind_rev:+.1f}%，风电是市场化赢家（约 {ratio:.1f}倍）"
+            )
+
+    # 检查火电同步退场
+    if "thermal" in f_cats and "thermal" in m_cats:
+        f_thermal_rev = f_cats["thermal"].get("同比收入(%)", 0)
+        m_thermal_rev = m_cats["thermal"].get("同比收入(%)", 0)
+        if f_thermal_rev < -30 and m_thermal_rev < -30:
+            insights.append(
+                f"💡 **关键观察 3 - 火电同步退场**: {full_label} {f_thermal_rev:+.1f}% ≈ {market_label} {m_thermal_rev:+.1f}%，两腿都短"
+            )
+
+    # 检查国际特点：水电是主业
+    if "hydro" in f_cats and "hydro" in m_cats:
+        f_hydro_share = f_cats["hydro"].get("占比(%)", 0)
+        m_hydro_share = m_cats["hydro"].get("占比(%)", 0)
+        if f_hydro_share > 70 and m_hydro_share > 70:
+            insights.append(
+                f"💡 **国际特点 - 水电主业极集中**: {full_label}水电 {f_hydro_share:.1f}%, {market_label} {m_hydro_share:.1f}%，国际业务水电是绝对主业"
+            )
+
+    # 检查新能源崛起（国际）
+    if "renewables" in f_cats and "renewables" in m_cats:
+        f_new_rev = f_cats["renewables"].get("同比收入(%)", 0)
+        m_new_rev = m_cats["renewables"].get("同比收入(%)", 0)
+        if f_new_rev > 20 and m_new_rev > 30:
+            insights.append(
+                f"💡 **国际特点 - 新能源强势崛起**: {full_label} {f_new_rev:+.1f}%, {market_label} {m_new_rev:+.1f}%，新能源在国际市场比国内增长更猛"
+            )
+
+    # 检查度电价差
+    if "hydro" in f_cats and "hydro" in m_cats:
+        f_price = f_cats["hydro"].get("度电(元)", 0)
+        m_price = m_cats["hydro"].get("度电(元)", 0)
+        diff = (f_price - m_price) * 100
+        if abs(diff) > 5:
+            insights.append(
+                f"💡 **国际特点 - 价差更大**: {full_label}水电 {f_price:.3f} vs {market_label} {m_price:.3f}，差距 {diff:+.1f} 分（比国内 1.6 分差距大）"
+            )
+
+    return insights
 
 
 def _render_plotly_charts(specs: dict):

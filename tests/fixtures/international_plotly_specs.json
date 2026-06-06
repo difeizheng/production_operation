@@ -1,0 +1,110 @@
+{
+  "yoy_volume_compare": {
+    "type": "bar",
+    "title": "国际同比电量对比 (全口径 vs 市场化)",
+    "data": {
+      "categories": [
+        "全口径",
+        "市场化"
+      ],
+      "values": [
+        2.36,
+        8.62
+      ]
+    }
+  },
+  "yoy_price_compare": {
+    "type": "bar",
+    "title": "国际同比度电对比 (分/度)",
+    "data": {
+      "categories": [
+        "全口径",
+        "市场化"
+      ],
+      "values": [
+        3.9,
+        2.7
+      ]
+    }
+  },
+  "yoy_revenue_direction": {
+    "type": "bar",
+    "title": "国际同比电费（方向同步：全口径 +16.66% vs 市场化 +21.85%）",
+    "data": {
+      "categories": [
+        "全口径",
+        "市场化"
+      ],
+      "values": [
+        16.66,
+        21.85
+      ]
+    }
+  },
+  "avg_price_compare": {
+    "type": "bar",
+    "title": "国际度电均价对比 (元/度)",
+    "data": {
+      "categories": [
+        "全口径",
+        "市场化"
+      ],
+      "values": [
+        0.32,
+        0.245
+      ]
+    }
+  },
+  "category_revenue_yoy": {
+    "type": "bar",
+    "title": "国际 5 品类同比收入对比",
+    "data": {
+      "categories": [
+        "水电",
+        "新能源",
+        "风电",
+        "光伏"
+      ],
+      "series": {
+        "全口径(%)": [
+          6.5,
+          27.5,
+          49.6,
+          22.5
+        ],
+        "市场化(%)": [
+          33.3,
+          47.5,
+          50.0,
+          53.1
+        ]
+      }
+    }
+  },
+  "category_fate_compare": {
+    "type": "bar",
+    "title": "国际 4 电源同比电量对比（无火电）",
+    "data": {
+      "categories": [
+        "水电",
+        "新能源",
+        "风电",
+        "光伏"
+      ],
+      "series": {
+        "全口径(%)": [
+          -2.0,
+          28.36,
+          42.96,
+          18.39
+        ],
+        "市场化(%)": [
+          3.83,
+          43.93,
+          32.49,
+          51.42
+        ]
+      }
+    }
+  }
+}
