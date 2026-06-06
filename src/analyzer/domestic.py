@@ -11,13 +11,23 @@
 - 分析框架: docs/analysis/domestic-price-analysis-framework.md (第 1-14 节)
 - 基础类: src/analyzer/base.py
 
-实施状态: ✅ Phase 2 完成
+v2.4 扩展:
+- 集成 MarketMetrics 模块，提供 18 组织 × 整体/市场化 双口径分析
+- 新增 market_dimension 字段（市场化率/电价差/象限）
+
+实施状态: ✅ v2.4 完成
 """
 
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
 from .base import BaseAnalyzer, AnalysisResult, create_empty_result
+from .market_metrics import (
+    analyze_market_dimension,
+    build_org_metrics,
+    MarketDimensionResult,
+    classify_organization,
+)
 
 
 # === 阈值配置（可被 config 覆盖）===
@@ -188,6 +198,18 @@ class DomesticAnalyzer(BaseAnalyzer):
             kpis, yoy_data, mom_data, categories_analysis, regions_analysis, anomalies
         )
 
+        # 12. v2.4 新增：市场化维度分析（如果有 v24 数据）
+        market_dimension = self._build_market_dimension()
+
+        # 把市场化 KPI 合并到 kpis 中
+        if market_dimension:
+            kpis["集团市场化率"] = round(market_dimension.total_market_rate, 2)
+            kpis["集团市场化电量(万kWh)"] = market_dimension.total_market_volume
+            # 增量表（市场化率排行 + 象限分布）
+            tables.extend(self._build_market_tables(market_dimension))
+            # 增量图表（市场化率柱状图）
+            charts.extend(self._build_market_charts(market_dimension))
+
         return AnalysisResult(
             dimension=self.dimension_name,
             section_ids=self.section_ids,
@@ -202,6 +224,136 @@ class DomesticAnalyzer(BaseAnalyzer):
             insights=insights,
             anomalies=anomalies,
         )
+
+    # === v2.4 新增：市场化维度 ===
+
+    def _build_market_dimension(self) -> Optional[MarketDimensionResult]:
+        """构建市场化维度分析
+
+        检测输入是否包含 v2.4 双口径数据（by_organization 字段）。
+        包含则调用 market_metrics 模块计算派生指标。
+
+        Returns:
+            MarketDimensionResult 或 None（无 v24 数据时）
+        """
+        by_org = self.data.get("by_organization")
+        if not by_org:
+            return None
+
+        # 尝试构造对应的市场化数据（要求 fixture 同时包含 market_data 字段）
+        market_data_external = self.data.get("_market_data_external")
+        if not market_data_external:
+            # 兼容性处理：如果整体数据中已包含 market_* 字段，直接用
+            # （单 fixture 双口径模式）
+            return self._build_market_from_combined(by_org)
+
+        # 双 fixture 模式
+        try:
+            orgs = build_org_metrics(by_org, market_data_external)
+            return analyze_market_dimension(orgs)
+        except (KeyError, ValueError) as e:
+            # 数据不完整时记录警告但不阻塞
+            self._validation_errors = self._validation_errors if hasattr(self, "_validation_errors") else []
+            self._validation_errors.append(f"market_dimension 构建失败: {e}")
+            return None
+
+    def _build_market_from_combined(self, by_org: dict) -> Optional[MarketDimensionResult]:
+        """从合并 fixture 构建（market_* 字段与 overall_* 共存）"""
+        # 拆分：把同组织的 market_* 字段组合为虚拟 market_data
+        market_data = {}
+        for name, data in by_org.items():
+            if "market_volume_wk" not in data:
+                return None  # 不是合并模式
+            market_data[name] = {
+                "market_volume_wk": data["market_volume_wk"],
+                "market_volume_yoy": data.get("market_volume_yoy", 0),
+                "market_volume_mom": data.get("market_volume_mom", 0),
+                "market_volume_ytd": data.get("market_volume_ytd", 0),
+                "market_volume_ytd_last": data.get("market_volume_ytd_last", 0),
+                "market_price_wk": data["market_price_wk"],
+                "market_price_yoy": data.get("market_price_yoy", 0),
+                "market_price_mom": data.get("market_price_mom", 0),
+                "market_price_ytd": data.get("market_price_ytd", 0),
+                "market_price_ytd_last": data.get("market_price_ytd_last", 0),
+                "market_revenue_wk": data["market_revenue_wk"],
+                "market_revenue_yoy": data.get("market_revenue_yoy", 0),
+                "market_revenue_mom": data.get("market_revenue_mom", 0),
+                "market_revenue_ytd": data.get("market_revenue_ytd", 0),
+                "market_revenue_ytd_last": data.get("market_revenue_ytd_last", 0),
+            }
+        try:
+            orgs = build_org_metrics(by_org, market_data)
+            return analyze_market_dimension(orgs)
+        except (KeyError, ValueError):
+            return None
+
+    def _build_market_tables(self, market_dim: MarketDimensionResult) -> List[Dict[str, Any]]:
+        """构建市场化表格"""
+        tables = []
+
+        # 表 4: 18 组织市场化率 + 电价差
+        active_rows = [
+            [d.name, classify_organization(d.category),
+             d.market_rate, d.price_diff, d.quadrant, d.revenue_contribution]
+            for d in market_dim.orgs if d.is_active_in_market
+        ]
+        inactive_rows = [
+            [d.name, classify_organization(d.category),
+             0.0, 0.0, "不参与", d.revenue_contribution]
+            for d in market_dim.orgs if not d.is_active_in_market
+        ]
+        # 按市场化率降序
+        active_rows.sort(key=lambda r: r[2], reverse=True)
+
+        tables.append({
+            "title": "各组织市场化维度（v2.4）",
+            "headers": ["组织", "业务桶", "市场化率(%)", "电价差(元/度)", "象限", "收入贡献(%)"],
+            "rows": active_rows + inactive_rows,
+        })
+
+        # 表 5: 象限分布
+        quad_rows = [[q, n] for q, n in market_dim.quadrant_distribution.items()]
+        tables.append({
+            "title": "组织象限分布（v2.4）",
+            "headers": ["象限", "组织数"],
+            "rows": quad_rows,
+        })
+
+        return tables
+
+    def _build_market_charts(self, market_dim: MarketDimensionResult) -> List[Dict[str, Any]]:
+        """构建市场化图表"""
+        charts = []
+
+        # 图表: 市场化率 TOP 12 柱状图
+        top_12 = sorted(
+            [d for d in market_dim.orgs if d.is_active_in_market],
+            key=lambda d: d.market_rate, reverse=True
+        )[:12]
+        charts.append({
+            "title": "各组织市场化率排行（v2.4）",
+            "type": "bar",
+            "data": {
+                "categories": [d.name for d in top_12],
+                "values": [d.market_rate for d in top_12],
+            },
+        })
+
+        # 图表: 电价差（+ 溢价 / - 折价）柱状图
+        sorted_by_diff = sorted(
+            [d for d in market_dim.orgs if d.is_active_in_market],
+            key=lambda d: d.price_diff, reverse=True
+        )
+        charts.append({
+            "title": "各组织电价差（市场化-整体）（v2.4）",
+            "type": "bar",
+            "data": {
+                "categories": [d.name for d in sorted_by_diff],
+                "values": [d.price_diff for d in sorted_by_diff],
+            },
+        })
+
+        return charts
 
     # === 内部方法 ===
 
