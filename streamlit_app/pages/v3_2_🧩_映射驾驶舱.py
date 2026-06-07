@@ -164,8 +164,8 @@ for i, m in enumerate(filtered, 1):
         else:
             st.caption("📌 无 fallback（必须有数据源）")
 
-        # 可编辑模式
-        with st.expander("✏️ 高级：编辑 Fallback", expanded=False):
+        # 可编辑模式（用 toggle 替代嵌套 expander，Streamlit 不允许 expander 嵌套）
+        if st.toggle("✏️ 高级：编辑 Fallback", key=f"toggle_fb_{placeholder}", value=False):
             new_fallback = st.text_area(
                 "Fallback 文本",
                 value=fallback,
