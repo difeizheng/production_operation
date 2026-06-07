@@ -12,6 +12,8 @@ v3 用 pipeline_state.get().raw_data + 4 个 analyzer results
     - 用 last_synced_data_id 记录上次同步的数据指纹
     - 指纹未变 → 跳过同步（避免循环）
     - 指纹变化 → 执行同步
+
+注意：safe_set_page_config 已移到 streamlit_app.core.safe_page_config（独立模块）
 """
 from __future__ import annotations
 
@@ -22,36 +24,6 @@ from typing import Any, Dict, Optional
 import streamlit as st
 
 logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# 辅助函数
-# ============================================================================
-
-def safe_set_page_config(**kwargs: Any) -> None:
-    """安全调用 st.set_page_config（避免与 app.py 重复调用冲突）。
-
-    v3.1+ 架构：app.py 用 st.navigation() 调度各 page。
-    - app.py 顶部已调用 set_page_config
-    - 各 page 原本的 set_page_config 需用此函数包裹
-    - 如果全局已设置，调用会被 Streamlit 拒绝，此函数静默忽略
-
-    只吞 "重复调用" 错误，其他异常照常抛出。
-
-    用法：
-        from streamlit_app.core.data_bridge import safe_set_page_config
-        safe_set_page_config(page_title="...", page_icon="...", layout="wide")
-    """
-    try:
-        st.set_page_config(**kwargs)
-    except Exception as e:
-        # StreamlitSetPageConfigMustBeFirstCommandError 表示已设置过
-        error_name = type(e).__name__
-        if "StreamlitSetPageConfig" in error_name or "SetPageConfig" in str(e):
-            logger.debug("set_page_config 已被 app.py 设置过: %s", e)
-            return
-        # 其他异常照常抛出
-        raise
 
 
 # === 同步状态 Key ===

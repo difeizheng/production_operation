@@ -35,6 +35,7 @@ from streamlit_app.core.data_bridge import (
     sync_v2_to_v3,
     sync_v3_to_v2,
 )
+from streamlit_app.core.safe_page_config import safe_set_page_config
 from streamlit_app.core.version_router import (
     DEFAULT_VERSION,
     VERSION_KEY,
@@ -72,6 +73,8 @@ __all__ = [
     "get_sync_status",
     "sync_v2_to_v3",
     "sync_v3_to_v2",
+    # safe_set_page_config（独立零依赖模块）
+    "safe_set_page_config",
     # version_router
     "DEFAULT_VERSION",
     "VERSION_KEY",

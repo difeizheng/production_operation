@@ -315,19 +315,33 @@ class TestClearAndStatus:
 # ============================================================================
 
 class TestSafeSetPageConfig:
-    """safe_set_page_config 测试 - 避免 set_page_config 重复调用报错。"""
+    """safe_set_page_config 测试 - 避免 set_page_config 重复调用报错。
 
-    def test_normal_call_passes_through(self, mock_streamlit) -> None:
-        mock_st, _, db = mock_streamlit
+    注意：safe_set_page_config 位于独立模块 streamlit_app.core.safe_page_config，
+    不在 data_bridge 中。这里 patch 该模块的 st 引用。
+    """
+
+    @pytest.fixture
+    def mock_safe_module(self):
+        """Mock safe_page_config 模块的 st 引用。"""
+        with patch.dict(os.environ, {}, clear=True):
+            from streamlit_app.core import safe_page_config as sp_module
+            mock_st = MagicMock()
+            mock_st.session_state = {}
+            sp_module.st = mock_st
+            yield mock_st, sp_module
+
+    def test_normal_call_passes_through(self, mock_safe_module) -> None:
+        mock_st, sp = mock_safe_module
         mock_st.set_page_config = MagicMock()
-        db.safe_set_page_config(page_title="测试", page_icon="📊", layout="wide")
+        sp.safe_set_page_config(page_title="测试", page_icon="📊", layout="wide")
         mock_st.set_page_config.assert_called_once_with(
             page_title="测试", page_icon="📊", layout="wide"
         )
 
-    def test_already_called_silently_ignored(self, mock_streamlit) -> None:
+    def test_already_called_silently_ignored(self, mock_safe_module) -> None:
         """当 set_page_config 抛错时（app.py 已调用过），safe 版本静默忽略。"""
-        mock_st, _, db = mock_streamlit
+        mock_st, sp = mock_safe_module
 
         def raise_error(**kwargs):
             from streamlit.errors import StreamlitSetPageConfigMustBeFirstCommandError
@@ -335,11 +349,11 @@ class TestSafeSetPageConfig:
 
         mock_st.set_page_config = MagicMock(side_effect=raise_error)
         # 不应抛错
-        db.safe_set_page_config(page_title="test")
+        sp.safe_set_page_config(page_title="test")
 
-    def test_other_exceptions_still_propagate(self, mock_streamlit) -> None:
+    def test_other_exceptions_still_propagate(self, mock_safe_module) -> None:
         """非 set_page_config 错误应正常抛出。"""
-        mock_st, _, db = mock_streamlit
+        mock_st, sp = mock_safe_module
         mock_st.set_page_config = MagicMock(side_effect=ValueError("其他错误"))
         with __import__("pytest").raises(ValueError):
-            db.safe_set_page_config(page_title="test")
+            sp.safe_set_page_config(page_title="test")

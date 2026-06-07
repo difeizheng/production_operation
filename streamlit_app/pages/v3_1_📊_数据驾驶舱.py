@@ -12,12 +12,14 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import pandas as pd
 import streamlit as st
 
-# 路径设置
+# 路径设置（必须在 import streamlit_app.* 之前）
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
+
+# === 关键：safe_set_page_config 必须在第一个 st 命令之前导入 ===
+from streamlit_app.core.safe_page_config import safe_set_page_config
 
 # === 页面配置 ===
 safe_set_page_config(
@@ -25,6 +27,9 @@ safe_set_page_config(
     page_icon="📊",
     layout="wide",
 )
+
+# === 页面内的其他 import（在 set_page_config 之后） ===
+import pandas as pd
 
 # === 导入 ===
 from src.collector.analysis_collector import AnalysisCollector

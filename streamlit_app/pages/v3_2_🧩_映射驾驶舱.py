@@ -21,6 +21,9 @@ import streamlit as st
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+# v3.1: 必须在第一个 st 命令之前导入
+from streamlit_app.core.safe_page_config import safe_set_page_config
+
 # === 页面配置 ===
 safe_set_page_config(
     page_title="映射驾驶舱 - 周报 v3.0",
