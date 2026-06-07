@@ -33,7 +33,10 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-st.set_page_config(
+# v3.1: 用 safe_set_page_config 避免与 app.py 重复调用
+from streamlit_app.core.data_bridge import safe_set_page_config
+
+safe_set_page_config(
     page_title="国内分析 - 周报 v2.4.1",
     page_icon="🏠",
     layout="wide"

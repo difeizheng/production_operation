@@ -13,7 +13,7 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-st.set_page_config(
+safe_set_page_config(
     page_title="碳资产分析 - 周报 v2",
     page_icon="🌱",
     layout="wide"
