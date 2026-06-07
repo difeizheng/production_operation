@@ -24,7 +24,9 @@ from streamlit_app.components import render_analyzer_result
 st.title("🌱 碳资产分析")
 st.markdown("### 段 8: 绿证 + CCER（卖空气换钱的新业务）")
 
-bundle = st.session_state.get("bundle")
+# v3.1: 使用 data_bridge.ensure_bundle 替代直接读 session_state
+from streamlit_app.core.data_bridge import ensure_bundle
+bundle = ensure_bundle()
 if not bundle or not bundle.get("results"):
     st.warning("⚠️ 请在主页面选择数据源")
     st.stop()

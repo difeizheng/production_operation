@@ -24,7 +24,9 @@ from streamlit_app.components import render_analyzer_result
 st.title("💹 市场化分析")
 st.markdown("### 段 5-7: 同一周 3 个相反故事")
 
-bundle = st.session_state.get("bundle")
+# v3.1: 使用 data_bridge.ensure_bundle 替代直接读 session_state
+from streamlit_app.core.data_bridge import ensure_bundle
+bundle = ensure_bundle()
 if not bundle or not bundle.get("results"):
     st.warning("⚠️ 请在主页面选择数据源")
     st.stop()

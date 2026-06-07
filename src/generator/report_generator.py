@@ -48,6 +48,57 @@ from src.generator.analysis_text import (
     generate_all_analysis_paragraphs,
     generate_spot_price_overview,
 )
+from src.generator.reason_resolver import (
+    ReasonResolver,
+    ResolvedSegment,
+)
+
+
+# ============================================================================
+# 占位符渲染辅助
+# ============================================================================
+
+def _render_reason(
+    reason_text: Optional[Dict[str, ResolvedSegment]],
+    placeholder: str,
+    fallback: str = "（待补充）",
+) -> str:
+    """从 reason_text 字典取占位符对应的文本，找不到或为空时返回 fallback。
+
+    Args:
+        reason_text: 占位符 → ResolvedSegment 字典（来自 ReasonResolver.resolve_all）
+        placeholder: 占位符，如 "{{ v4_P6_dom_elec_yoy_wow }}"
+        fallback: 兜底字符串
+
+    Returns:
+        最终文本
+    """
+    if not reason_text:
+        return fallback
+    seg = reason_text.get(placeholder)
+    if seg is None or not seg.final_text.strip():
+        return fallback
+    return seg.final_text
+
+
+def _build_reason_paragraphs(
+    doc: Document,
+    reason_text: Optional[Dict[str, ResolvedSegment]],
+    placeholders: List[str],
+) -> None:
+    """批量添加 reason 段落，跳过空文本。
+
+    Args:
+        doc: Document 对象
+        reason_text: 占位符字典
+        placeholders: 要渲染的占位符列表
+    """
+    if not reason_text:
+        return
+    for ph in placeholders:
+        seg = reason_text.get(ph)
+        if seg and seg.final_text.strip():
+            doc.add_paragraph(seg.final_text)
 
 
 class ReportGenerator:
@@ -63,6 +114,7 @@ class ReportGenerator:
         output_filename: Optional[str] = None,
         year: Optional[int] = None,
         week: Optional[int] = None,
+        reason_text: Optional[Dict[str, ResolvedSegment]] = None,
     ) -> str:
         """生成完整的 Word 报告。
 
@@ -71,6 +123,8 @@ class ReportGenerator:
             output_filename: 输出文件名
             year: 年份
             week: 周数
+            reason_text: 占位符 → ResolvedSegment 字典（来自 ReasonResolver）
+                         None 时使用"（待补充）"占位（向后兼容）
 
         Returns:
             生成的文件路径
@@ -97,10 +151,10 @@ class ReportGenerator:
 
         # 构建文档
         self._build_title(doc, data, year, week)
-        self._build_section_1(doc, data)
-        self._build_section_2(doc, data)
-        self._build_section_3(doc, data)
-        self._build_section_4(doc, data)
+        self._build_section_1(doc, data, reason_text)
+        self._build_section_2(doc, data, reason_text)
+        self._build_section_3(doc, data, reason_text)
+        self._build_section_4(doc, data, reason_text)
 
         # 保存
         doc.save(output_file)
@@ -130,7 +184,12 @@ class ReportGenerator:
         run = heading.add_run(f"第{week}周生产情况{date_str}")
         run.font.name = "黑体"
 
-    def _build_section_1(self, doc: Document, data: Dict[str, Any]) -> None:
+    def _build_section_1(
+        self,
+        doc: Document,
+        data: Dict[str, Any],
+        reason_text: Optional[Dict[str, ResolvedSegment]] = None,
+    ) -> None:
         """构建'一、上周销售情况'章节。"""
         doc.add_heading("一、上周销售情况", level=1)
 
@@ -141,9 +200,14 @@ class ReportGenerator:
         summary = generate_electricity_summary(data)
         doc.add_paragraph(summary)
 
-        # 同比/环比分析段落（含原因）
+        # 同比/环比分析段落（含原因）- P6: 长江电力+全集团 原因
         yoy_para = generate_domestic_yoy_paragraph(data)
         doc.add_paragraph(yoy_para)
+
+        # P6 原因补充（如果 reason_text 提供）
+        p6_reason = _render_reason(reason_text, "{{ v4_P6_dom_elec_yoy_wow }}", "")
+        if p6_reason:
+            doc.add_paragraph(p6_reason)
 
         # 来水情况（仍需外部数据）
         doc.add_paragraph("（来水情况待补充）")
@@ -158,27 +222,57 @@ class ReportGenerator:
         price_yoy = generate_domestic_price_yoy_paragraph(data)
         doc.add_paragraph(price_yoy)
 
-        # 各品类同比原因（占位）
-        doc.add_paragraph("（各品类电价同比原因待补充）")
+        # P11: 国内电价同比 品类原因
+        p11_reason = _render_reason(reason_text, "{{ v4_P11_dom_price_yoy }}", "")
+        if p11_reason:
+            doc.add_paragraph(p11_reason)
+        else:
+            doc.add_paragraph("（各品类电价同比原因待补充）")
 
         # 环比分析段落
         price_wow = generate_domestic_price_wow_paragraph(data)
         doc.add_paragraph(price_wow)
 
-        # 各品类环比原因
-        for cat in ["水电", "风电", "光伏", "火电"]:
-            reason = generate_category_price_reason_paragraph(cat, data, "wow")
-            doc.add_paragraph(reason)
+        # P12: 国内电价环比 品类原因
+        p12_reason = _render_reason(reason_text, "{{ v4_P12_dom_price_wow }}", "")
+        if p12_reason:
+            doc.add_paragraph(p12_reason)
+
+        # P13-P16: 品类级环比原因（4 段）
+        for placeholder in [
+            "{{ v4_P13_hydro_price_wow }}",
+            "{{ v4_P14_wind_price_wow }}",
+            "{{ v4_P15_solar_price_wow }}",
+            "{{ v4_P16_thermal_price_wow }}",
+        ]:
+            reason = _render_reason(reason_text, placeholder, "")
+            if reason:
+                doc.add_paragraph(reason)
+            else:
+                # 保持向后兼容
+                # 注意：generate_category_price_reason_paragraph 也被移除依赖
+                # 这里仅在没有 reason_text 时输出占位
+                pass
+
+        # 兼容旧模式：循环 4 个品类（仅在无 reason_text 时）
+        if not reason_text:
+            for cat in ["水电", "风电", "光伏", "火电"]:
+                reason_old = generate_category_price_reason_paragraph(cat, data, "wow")
+                if "（" in reason_old and "待补充" in reason_old:
+                    doc.add_paragraph(reason_old)
 
         # 表1：销售情况表
         doc.add_paragraph("表1 上周销售情况（亿千瓦时；元/千瓦时）")
         create_sales_table(doc, data)
 
-        # 发电收入总结
+        # P18: 发电收入总结 + 原因
         revenue_summary = generate_revenue_summary(data)
         doc.add_paragraph(revenue_summary)
+        p18_reason = _render_reason(reason_text, "{{ v4_P18_dom_revenue }}", "")
+        if p18_reason:
+            doc.add_paragraph(p18_reason)
 
-        # 2. 国际上网电价（待补充）
+        # 2. 国际上网电价
         doc.add_heading("2.国际上网电价", level=3)
         intl = data.get("international", {})
         intl_price = intl.get("price", {}).get("total")
@@ -189,20 +283,67 @@ class ReportGenerator:
                 f"约每千瓦时{intl_price:.3f}元，"
                 f"同比度电{'提高' if intl_yoy > 0 else '下降'}"
                 f"{abs(intl_yoy) * 100:.1f}分。"
-                f"（详细分析待补充）"
             )
         else:
             doc.add_paragraph("（待补充）")
 
-        # 3. 市场化交易情况（待补充）
+        # P20: 国际电价同比 原因
+        p20_reason = _render_reason(reason_text, "{{ v4_P20_intl_price_yoy }}", "")
+        if p20_reason:
+            doc.add_paragraph(p20_reason)
+
+        # P21: 国际电价环比 原因
+        p21_reason = _render_reason(reason_text, "{{ v4_P21_intl_price_wow }}", "")
+        if p21_reason:
+            doc.add_paragraph(p21_reason)
+
+        # 3. 市场化交易情况
         doc.add_heading("3.市场化交易情况", level=3)
-        doc.add_paragraph("（待补充）")
+
+        # P23: 市场化水电
+        p23_reason = _render_reason(reason_text, "{{ v4_P23_market_hydro }}", "")
+        if p23_reason:
+            doc.add_paragraph(p23_reason)
+        else:
+            doc.add_paragraph("水电项目：")
+            doc.add_paragraph("（市场化水电交易情况待补充）")
+
+        # P24: 市场化新能源
+        p24_reason = _render_reason(reason_text, "{{ v4_P24_market_new_energy }}", "")
+        if p24_reason:
+            doc.add_paragraph(p24_reason)
+        else:
+            doc.add_paragraph("新能源项目：")
+            doc.add_paragraph("（市场化新能源交易情况待补充）")
+
+        # P25: 市场化火电
+        p25_reason = _render_reason(reason_text, "{{ v4_P25_market_thermal }}", "")
+        if p25_reason:
+            doc.add_paragraph(p25_reason)
+        else:
+            doc.add_paragraph("火电项目：")
+            doc.add_paragraph("（市场化火电交易情况待补充）")
 
         # （二）绿证、CCER
         doc.add_paragraph("（二）绿证、CCER核发交易情况")
-        doc.add_paragraph("（待补充）")
+        # P27: 绿证
+        p27_reason = _render_reason(reason_text, "{{ v4_P27_green_cert }}", "")
+        if p27_reason:
+            doc.add_paragraph(p27_reason)
+        else:
+            doc.add_paragraph("（待补充）")
 
-    def _build_section_2(self, doc: Document, data: Dict[str, Any]) -> None:
+        # P28: CCER（暂未映射，可后续扩展）
+        p28_reason = _render_reason(reason_text, "{{ v4_P28_ccer }}", "")
+        if p28_reason:
+            doc.add_paragraph(p28_reason)
+
+    def _build_section_2(
+        self,
+        doc: Document,
+        data: Dict[str, Any],
+        reason_text: Optional[Dict[str, ResolvedSegment]] = None,
+    ) -> None:
         """构建'二、外部信息'章节。"""
         doc.add_heading("二、外部信息", level=1)
         doc.add_paragraph("（一）（待补充）")
@@ -235,12 +376,22 @@ class ReportGenerator:
             doc.add_paragraph("表2 上周现货市场均价（元/千瓦时）")
             create_spot_price_table(doc)
 
-    def _build_section_3(self, doc: Document, data: Dict[str, Any]) -> None:
+    def _build_section_3(
+        self,
+        doc: Document,
+        data: Dict[str, Any],
+        reason_text: Optional[Dict[str, ResolvedSegment]] = None,
+    ) -> None:
         """构建'三、重点工作情况'章节。"""
         doc.add_heading("三、重点工作情况", level=1)
         doc.add_paragraph("（待补充）")
 
-    def _build_section_4(self, doc: Document, data: Dict[str, Any]) -> None:
+    def _build_section_4(
+        self,
+        doc: Document,
+        data: Dict[str, Any],
+        reason_text: Optional[Dict[str, ResolvedSegment]] = None,
+    ) -> None:
         """构建'四、本周重点工作'章节。"""
         p = doc.add_paragraph()
         run = p.add_run("四、本周重点工作")

@@ -24,8 +24,9 @@ from streamlit_app.utils.data_loader import get_report_meta
 st.title("📄 报告生成")
 st.markdown("### 汇总 4 维度分析 → Markdown 报告")
 
-# 从 session_state 读取
-bundle = st.session_state.get("bundle")
+# v3.1: 使用 data_bridge.ensure_bundle 替代直接读 session_state
+from streamlit_app.core.data_bridge import ensure_bundle
+bundle = ensure_bundle()
 if not bundle or not bundle.get("results"):
     st.warning("⚠️ 请在主页面选择数据源")
     st.stop()

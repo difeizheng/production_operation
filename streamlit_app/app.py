@@ -1,16 +1,19 @@
 """
-周报自动化 v2 - Streamlit 主入口
-=================================
+周报分析平台 - 主入口（v3.1 路由重构）
+====================================
 
-基于 docs/design/business-map-master.md 业务图谱构建
-实现 4 维度 × 8 段实战的交互式可视化
+使用 Streamlit 1.41+ 的 st.navigation + st.Page 实现：
+    - 侧边栏按版本分组（v2 稳定版 / v3 生产试用）
+    - URL 参数 ?version=v2/v3 支持深链
+    - 数据在 v2/v3 之间自动桥接
 
-运行方式:
+启动方式:
     PYTHONPATH=. streamlit run streamlit_app/app.py
 
 设计文档:
+    - v3.1 路由设计: docs/design/v3.1-menu-routing.md
+    - v3.0 驾驶舱: docs/design/report-generator-v3-architecture.md
     - 业务图谱: docs/design/business-map-master.md
-    - 架构设计: docs/design/report-generator-v2-architecture.md
 """
 
 import sys
@@ -22,186 +25,156 @@ import streamlit as st
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# === Streamlit 页面配置 ===
+# === Streamlit 页面配置（必须在最前） ===
 st.set_page_config(
-    page_title="周报分析平台 v2",
+    page_title="周报分析平台",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'About': "周报自动化系统 v2 - 4 维度全覆盖"
+        "About": "周报自动化系统 v3.1 - 路由重构 + v2/v3 数据共享"
+    },
+)
+
+# === 延迟导入（确保 set_page_config 已执行） ===
+from streamlit_app.core.version_router import (
+    get_current_version,
+    render_version_switcher,
+    set_version,
+    switch_to_version,
+)
+from streamlit_app.core.data_bridge import auto_sync
+from streamlit_app.components.version_badge import (
+    render_home_hero,
+    render_v3_title_gradient,
+    render_version_badge,
+)
+
+
+# ============================================================================
+# 主页
+# ============================================================================
+
+def _home_page() -> None:
+    """主页：版本概览 + 切换 CTA。"""
+    current = get_current_version()
+    render_home_hero(current)
+
+
+# Streamlit 1.41+ 推荐用 st.Page 包装
+home = st.Page(
+    _home_page,
+    title="首页",
+    icon="🏠",
+    default=True,
+    url_path="",
+)
+
+
+# ============================================================================
+# v3 页面（生产试用）
+# ============================================================================
+
+v3_pages = [
+    st.Page(
+        "pages/v3_1_📊_数据驾驶舱.py",
+        title="数据驾驶舱",
+        icon="📊",
+        url_path="v3_data",
+    ),
+    st.Page(
+        "pages/v3_2_🧩_映射驾驶舱.py",
+        title="映射驾驶舱",
+        icon="🧩",
+        url_path="v3_mapping",
+    ),
+    st.Page(
+        "pages/v3_3_🤖_生成驾驶舱.py",
+        title="生成驾驶舱",
+        icon="🤖",
+        url_path="v3_generate",
+    ),
+]
+
+
+# ============================================================================
+# v2 页面（稳定版）
+# ============================================================================
+
+v2_pages = [
+    st.Page(
+        "pages/v2_1_🏠_国内分析.py",
+        title="国内分析",
+        icon="🏠",
+        url_path="v2_domestic",
+    ),
+    st.Page(
+        "pages/v2_2_🌍_国际分析.py",
+        title="国际分析",
+        icon="🌍",
+        url_path="v2_international",
+    ),
+    st.Page(
+        "pages/v2_3_💹_市场化分析.py",
+        title="市场化分析",
+        icon="💹",
+        url_path="v2_market",
+    ),
+    st.Page(
+        "pages/v2_4_🌱_碳资产分析.py",
+        title="碳资产分析",
+        icon="🌱",
+        url_path="v2_environmental",
+    ),
+    st.Page(
+        "pages/v2_5_📄_报告生成.py",
+        title="报告生成",
+        icon="📄",
+        url_path="v2_report",
+    ),
+]
+
+
+# ============================================================================
+# 路由决策
+# ============================================================================
+
+current_version = get_current_version()
+
+# v3 默认在前，v2 在后（生产试用优先）
+if current_version == "v3":
+    nav_structure = {
+        "🏠 首页": [home],
+        "🎯 v3.0 驾驶舱（生产试用）🆕": v3_pages,
+        "📦 v2.0 分析平台（稳定版）": v2_pages,
     }
-)
+else:
+    # v2 用户：v2 在前，v3 折叠在底部
+    nav_structure = {
+        "🏠 首页": [home],
+        "📦 v2.0 分析平台（稳定版）✅": v2_pages,
+        "🎯 v3.0 驾驶舱（生产试用）🆕": v3_pages,
+    }
 
-# === 导入数据加载器 ===
-from streamlit_app.utils.data_loader import (
-    load_data_and_analyze,
-    get_report_meta,
-)
 
+# ============================================================================
+# 侧边栏版本切换器（在 st.navigation 渲染后覆盖）
+# ============================================================================
 
-# === 侧边栏：数据源控制 ===
+# 渲染版本徽章 + 切换器（侧边栏顶部）
 with st.sidebar:
-    st.header("⚙️ 数据源")
+    render_version_badge(current_version)
+    if current_version == "v3":
+        render_v3_title_gradient()
 
-    # 数据源选择
-    data_source = st.radio(
-        "选择数据源",
-        options=["🎭 演示数据（5/22 周报）", "📁 上传 JSON 文件"],
-        index=0,
-        help="演示数据使用合并 fixture；上传支持自定义 JSON",
-    )
+# 渲染 st.navigation
+nav = st.navigation(nav_structure)
 
-    uploaded_file = None
-    use_default = True
+# 渲染侧边栏版本切换器（在导航下方）
+render_version_switcher()
 
-    if data_source == "📁 上传 JSON 文件":
-        uploaded_file = st.file_uploader(
-            "上传周报 JSON",
-            type=["json"],
-            help="JSON 需包含 group_total/international/market_trading/environmental_assets 等字段",
-        )
-        use_default = False
+# === 数据自动同步（v2/v3 之间） ===
+auto_sync()
 
-    st.divider()
-
-    # 加载数据 + 执行 Analyzer
-    with st.spinner("加载数据并执行 4 Analyzer..."):
-        bundle = load_data_and_analyze(
-            uploaded_file=uploaded_file,
-            use_default=use_default,
-        )
-
-    # 存入 session_state 供页面间共享
-    st.session_state["bundle"] = bundle
-
-    data = bundle["data"]
-    results = bundle["results"]
-    source = bundle["source"]
-
-    # 显示报告元信息
-    if data:
-        meta = get_report_meta(data)
-        st.success(
-            f"✅ 报告: `{meta.get('report_id')}`\n\n"
-            f"📅 {meta.get('year')} 年第 {meta.get('week')} 周\n"
-            f"({meta.get('start_date')} ~ {meta.get('end_date')})"
-        )
-        st.caption(f"数据源: {'演示数据' if source == 'default' else '上传文件'}")
-
-    st.divider()
-
-    # 帮助
-    with st.expander("ℹ️ 帮助"):
-        st.markdown("""
-        **5 个页面**:
-        1. 🏠 国内分析（段 1-2）
-        2. 🌍 国际分析（段 3-4）
-        3. 💹 市场化分析（段 5-7）
-        4. 🌱 碳资产分析（段 8）
-        5. 📄 报告生成
-
-        **关键文档**:
-        - `docs/design/business-map-master.md`
-        - `docs/design/report-generator-v2-architecture.md`
-        - `docs/analysis/domestic-price-analysis-framework.md`
-        """)
-
-
-# === 主区域 ===
-st.title("📊 周报分析平台 v2")
-st.markdown("""
-### 4 维度 × 8 段实战 - 业务图谱全覆盖
-
-- 🏠 **国内** - 段 1-2（89.1 亿度 / 0.311 元 / 以量补价）
-- 🌍 **国际** - 段 3-4（0.32 元 / 能力动能）
-- 💹 **市场化** - 段 5-7（3 板块 / 3 机制 / 东方不亮西方亮）
-- 🌱 **碳资产** - 段 8（4.94 亿家底 / 卖空气换钱）
-- 📄 **报告生成** - 一键导出
-""")
-
-# 数据加载状态
-if data is None:
-    st.warning("⚠️ 请在左侧边栏选择数据源")
-    st.stop()
-
-# 显示快速概览
-st.divider()
-st.markdown("### 🎯 4 维度快速概览")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    if results.get("domestic"):
-        st.metric(
-            "🏠 国内",
-            f"{results['domestic'].kpis.get('国内上网电量', 0)} 亿度",
-            delta=f"同比 {results['domestic'].kpis.get('同比电量', 0):+.1f}%",
-        )
-    else:
-        st.metric("🏠 国内", "—")
-
-with col2:
-    if results.get("international"):
-        st.metric(
-            "🌍 国际",
-            f"{results['international'].kpis.get('国际度电均价', 0)} 元",
-            delta=f"同比 {results['international'].kpis.get('国际同比度电', 0):+.1f}分",
-        )
-    else:
-        st.metric("🌍 国际", "—")
-
-with col3:
-    if results.get("market_trading"):
-        st.metric(
-            "💹 市场化",
-            f"{results['market_trading'].kpis.get('新能源省份数', 0)} 省",
-            delta=f"火电环比 {results['market_trading'].kpis.get('火电环比', 0):+.1f}分",
-        )
-    else:
-        st.metric("💹 市场化", "—")
-
-with col4:
-    if results.get("environmental"):
-        st.metric(
-            "🌱 碳资产",
-            f"{results['environmental'].kpis.get('总库存价值(亿元)', 0)} 亿元",
-            delta=f"库存 {results['environmental'].kpis.get('绿证库存(万张)', 0)} 万张",
-        )
-    else:
-        st.metric("🌱 碳资产", "—")
-
-# 全维度异常概览
-st.divider()
-st.markdown("### ⚠️ 异常概览")
-
-anomaly_count = {
-    "domestic": len(results.get("domestic").anomalies) if results.get("domestic") else 0,
-    "international": len(results.get("international").anomalies) if results.get("international") else 0,
-    "market_trading": len(results.get("market_trading").anomalies) if results.get("market_trading") else 0,
-    "environmental": len(results.get("environmental").anomalies) if results.get("environmental") else 0,
-}
-
-cols = st.columns(4)
-dimension_names = ["🏠 国内", "🌍 国际", "💹 市场化", "🌱 碳资产"]
-dimension_keys = ["domestic", "international", "market_trading", "environmental"]
-for col, name, key in zip(cols, dimension_names, dimension_keys):
-    with col:
-        count = anomaly_count[key]
-        if count == 0:
-            st.success(f"{name}\n\n✅ 无异常")
-        else:
-            st.warning(f"{name}\n\n⚠️ {count} 个异常")
-
-# 使用提示
-st.divider()
-st.info("💡 **使用提示**: 点击左侧导航栏进入各维度分析页面，或前往'报告生成'查看完整分析。")
-
-
-# === 底部信息 ===
-st.divider()
-st.caption(f"""
-📖 设计文档: `docs/design/business-map-master.md` |
-`docs/design/report-generator-v2-architecture.md`
-v2.0 - 4 Analyzer + Streamlit UI
-""")
+# === 运行当前页面 ===
+nav.run()

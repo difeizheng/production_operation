@@ -18,3 +18,9 @@ pytest-cov>=4.1.0
 
 # Optional: LLM integration
 anthropic>=0.18.0
+openai>=1.0.0
+python-dotenv>=1.0.0
+
+# Optional: docxtpl
+docxtpl>=0.16.7
+Jinja2>=3.1.2

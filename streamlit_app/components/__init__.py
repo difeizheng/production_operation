@@ -11,9 +11,18 @@ Streamlit 复用组件包
 - comparison_view: 双口径对比视图（v2.1 新增，v2.2 支持国内/国际）
 - unit_view: 按公司拆分视图（v2.3 新增）
 - market_view: 市场化维度视图（v2.4 新增）
+
+v3.0 新增（人机协同驾驶舱）:
+- stepper: 7 步导航
+- data_preview: Excel 数据预览
+- diff_viewer: 原文/润色对比
+- slot_editor: 段位编辑器（核心）
+
+v3.1 新增（v2/v3 路由）:
+- version_badge: 视觉徽章 + 跨版本跳转
 """
 
-__version__ = "2.4.0-phase6"
+__version__ = "3.1.0-phase1"
 
 from .kpi_card import kpi_card, kpi_grid, kpi_row
 from .chart_renderer import render_chart, render_charts, render_simple_bar
@@ -34,6 +43,39 @@ from .market_view import (
     render_price_diff_scatter,
     render_org_quadrant_distribution,
     render_category_bucket_pie,
+)
+
+# v3.0 新增
+from .stepper import (
+    PIPELINE_STEPS,
+    render_pipeline_stepper,
+    render_stepper,
+)
+from .data_preview import (
+    categorize_field,
+    detect_anomalies,
+    render_excel_preview,
+    render_kpi_overview,
+)
+from .diff_viewer import (
+    compute_diff_stats,
+    extract_numbers,
+    highlight_numbers,
+    render_diff,
+    render_diff_inline,
+    render_diff_summary,
+)
+from .slot_editor import (
+    render_params_panel,
+    render_slot_editor,
+)
+# v3.1 新增
+from .version_badge import (
+    render_cross_version_link,
+    render_home_hero,
+    render_switch_button,
+    render_v3_title_gradient,
+    render_version_badge,
 )
 
 __all__ = [
@@ -70,4 +112,26 @@ __all__ = [
     "render_price_diff_scatter",
     "render_org_quadrant_distribution",
     "render_category_bucket_pie",
+    # v3.0 新增
+    "PIPELINE_STEPS",
+    "render_pipeline_stepper",
+    "render_stepper",
+    "categorize_field",
+    "detect_anomalies",
+    "render_excel_preview",
+    "render_kpi_overview",
+    "compute_diff_stats",
+    "extract_numbers",
+    "highlight_numbers",
+    "render_diff",
+    "render_diff_inline",
+    "render_diff_summary",
+    "render_params_panel",
+    "render_slot_editor",
+    # v3.1 新增
+    "render_cross_version_link",
+    "render_home_hero",
+    "render_switch_button",
+    "render_v3_title_gradient",
+    "render_version_badge",
 ]

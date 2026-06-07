@@ -108,12 +108,42 @@ def run_analysis_pipeline(
     if not quiet:
         print(f"  JSON: {json_path}")
 
+    # 2b. 原因文本解析（新功能 - Step 4-6 整合 + Step 8 数据驱动）
+    reason_text = None
+    if summary_path:
+        if not quiet:
+            print(f"\n[Step 2b] 原因文本解析（Excel → 占位符字典）")
+
+        from src.generator.reason_resolver import ReasonResolver
+
+        # 传入 data 用于 grounded_category 模式（4 个品类级原因）
+        resolver = ReasonResolver(data=data)
+        reason_text = resolver.resolve_all(summary_file=summary_path, data=data)
+        stats = resolver.get_stats(reason_text)
+
+        results["steps"].append("resolve_reasons")
+        results["reason_stats"] = {
+            "total": stats["total"],
+            "by_level": stats["by_level"],
+            "polished_count": stats["polished_count"],
+            "fallback_count": stats["fallback_count"],
+            "automation_rate": stats["automation_rate"],
+        }
+
+        if not quiet:
+            print(f"  解析段落: {stats['total']}")
+            print(f"  自动化覆盖: {stats['automation_rate']:.0%}")
+            print(f"  润色数: {stats['polished_count']} / Fallback: {stats['fallback_count']}")
+            print(f"  按等级: {stats['by_level']}")
+
     # 3. 报告生成
     if not quiet:
         print(f"\n[Step 3] 报告生成")
 
     generator = ReportGenerator(output_dir=output_dir)
-    report_path = generator.generate_report(data, year=year, week=week)
+    report_path = generator.generate_report(
+        data, year=year, week=week, reason_text=reason_text,
+    )
 
     results["steps"].append("generate")
     results["files"]["report"] = report_path
