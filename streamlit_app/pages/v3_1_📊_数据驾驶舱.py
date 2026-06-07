@@ -44,22 +44,45 @@ from streamlit_app.components import (
 
 # === 工具函数 ===
 def collect_analysis_data(excel_path: Path) -> Optional[Dict[str, Any]]:
-    """从综合分析表采集数据。"""
+    """从综合分析表采集数据。
+
+    AnalysisCollector.collect() 返回 Tuple[Dict, List[Dict]]：
+        (data_dict, errors_list)
+    本函数解包后只返回 data_dict（错误信息通过其他渠道显示）。
+    """
     try:
         collector = AnalysisCollector()
-        data = collector.collect(str(excel_path))
-        return data
+        result = collector.collect(str(excel_path))
+        # v3.1 bug fix: 解包 (data, errors) tuple
+        if isinstance(result, tuple):
+            data, errors = result
+            if errors:
+                st.warning(f"⚠️ 采集时发现 {len(errors)} 个问题（已忽略）")
+            return data
+        # 向后兼容：老版本可能直接返回 dict
+        return result
     except Exception as e:
         st.error(f"❌ 数据采集失败: {e}")
         return None
 
 
 def collect_summary_data(summary_path: Path) -> Optional[Dict[str, Any]]:
-    """从汇总表采集补充数据。"""
+    """从汇总表采集补充数据。
+
+    SummaryCollector.collect() 返回 Tuple[Dict, List[Dict]]：
+        (data_dict, errors_list)
+    本函数解包后只返回 data_dict。
+    """
     try:
         collector = SummaryCollector()
-        data = collector.collect(str(summary_path))
-        return data
+        result = collector.collect(str(summary_path))
+        # v3.1 bug fix: 解包 (data, errors) tuple
+        if isinstance(result, tuple):
+            data, errors = result
+            if errors:
+                st.info(f"ℹ️ 汇总表采集: {len(errors)} 个非致命问题（已忽略）")
+            return data
+        return result
     except Exception as e:
         st.warning(f"⚠️ 汇总表采集失败（可忽略）: {e}")
         return None
