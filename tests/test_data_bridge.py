@@ -116,7 +116,7 @@ class TestEnsureBundle:
         mock_st, mock_session, db = mock_streamlit
         with patch("streamlit_app.utils.data_loader.load_data_and_analyze") as mock_load, \
              patch("streamlit_app.core.get_state_manager") as mock_mgr_fn:
-            mock_mgr_fn.return_value.raw_data = None
+            mock_mgr_fn.return_value.get.return_value.raw_data = None
             mock_load.return_value = {
                 "data": {"a": 1},
                 "results": {"domestic": "x"},
@@ -132,7 +132,7 @@ class TestEnsureBundle:
         mock_session["bundle"] = {"data": None, "results": {}, "source": "none"}
         with patch("streamlit_app.utils.data_loader.load_data_and_analyze") as mock_load, \
              patch("streamlit_app.core.get_state_manager") as mock_mgr_fn:
-            mock_mgr_fn.return_value.raw_data = None
+            mock_mgr_fn.return_value.get.return_value.raw_data = None
             mock_load.return_value = {
                 "data": {"a": 1},
                 "results": {},
@@ -152,7 +152,7 @@ class TestSyncV3ToV2:
     def test_no_v3_data_skips(self, mock_streamlit, sample_data) -> None:
         mock_st, mock_session, db = mock_streamlit
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn:
-            mock_mgr_fn.return_value.raw_data = None
+            mock_mgr_fn.return_value.get.return_value.raw_data = None
             result = db.sync_v3_to_v2()
             assert result is False
             assert "bundle" not in mock_session
@@ -161,7 +161,7 @@ class TestSyncV3ToV2:
         mock_st, mock_session, db = mock_streamlit
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn, \
              patch("streamlit_app.utils.data_loader.run_all_analyzers") as mock_run:
-            mock_mgr_fn.return_value.raw_data = sample_data
+            mock_mgr_fn.return_value.get.return_value.raw_data = sample_data
             mock_run.return_value = {"domestic": "analyzer_result"}
 
             result = db.sync_v3_to_v2()
@@ -177,7 +177,7 @@ class TestSyncV3ToV2:
         mock_session[db.SYNC_FINGERPRINT_KEY] = fp
 
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn:
-            mock_mgr_fn.return_value.raw_data = sample_data
+            mock_mgr_fn.return_value.get.return_value.raw_data = sample_data
 
             result = db.sync_v3_to_v2()
             assert result is False
@@ -190,7 +190,7 @@ class TestSyncV3ToV2:
 
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn, \
              patch("streamlit_app.utils.data_loader.run_all_analyzers") as mock_run:
-            mock_mgr_fn.return_value.raw_data = sample_data
+            mock_mgr_fn.return_value.get.return_value.raw_data = sample_data
             mock_run.return_value = {}
 
             result = db.sync_v3_to_v2(force=True)
@@ -234,7 +234,7 @@ class TestAutoSync:
         mock_session[db.SYNC_FINGERPRINT_KEY] = fp
 
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn:
-            mock_mgr_fn.return_value.raw_data = sample_data
+            mock_mgr_fn.return_value.get.return_value.raw_data = sample_data
             # auto_sync 应检测到一致，不调用同步
             db.auto_sync()
             # 无 update_field 调用
@@ -245,7 +245,7 @@ class TestAutoSync:
         # v3 有数据，v2 没有
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn, \
              patch("streamlit_app.utils.data_loader.run_all_analyzers") as mock_run:
-            mock_mgr_fn.return_value.raw_data = sample_data
+            mock_mgr_fn.return_value.get.return_value.raw_data = sample_data
             mock_run.return_value = {}
 
             db.auto_sync()
@@ -257,7 +257,7 @@ class TestAutoSync:
         # v2 有数据，v3 没有
         mock_session["bundle"] = {"data": sample_data, "results": {}, "source": "default"}
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn:
-            mock_mgr_fn.return_value.raw_data = None
+            mock_mgr_fn.return_value.get.return_value.raw_data = None
 
             db.auto_sync()
             # v2 → v3 应更新 state
@@ -288,7 +288,7 @@ class TestClearAndStatus:
         mock_st, mock_session, db = mock_streamlit
         mock_session["bundle"] = {"data": sample_data, "results": {}, "source": "default"}
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn:
-            mock_mgr_fn.return_value.raw_data = None
+            mock_mgr_fn.return_value.get.return_value.raw_data = None
 
             status = db.get_sync_status()
             assert status["v2_has_bundle"] is True
@@ -305,6 +305,6 @@ class TestClearAndStatus:
         mock_st, mock_session, db = mock_streamlit
         # v2 没有
         with patch("streamlit_app.core.get_state_manager") as mock_mgr_fn:
-            mock_mgr_fn.return_value.raw_data = sample_data
+            mock_mgr_fn.return_value.get.return_value.raw_data = sample_data
             result = db.get_shared_data()
             assert result == sample_data

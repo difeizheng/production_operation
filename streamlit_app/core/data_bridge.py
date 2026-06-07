@@ -78,7 +78,7 @@ def sync_v3_to_v2(force: bool = False) -> bool:
         logger.error("导入失败: %s", e)
         return False
 
-    state = get_state_manager()
+    state = get_state_manager().get()
     if not state.raw_data:
         return False
 
@@ -153,7 +153,7 @@ def auto_sync() -> None:
     except ImportError:
         return
 
-    state = get_state_manager()
+    state = get_state_manager().get()
     bundle = st.session_state.get(BUNDLE_KEY)
 
     # 比较指纹
@@ -213,7 +213,7 @@ def get_shared_data() -> Optional[Dict[str, Any]]:
 
     try:
         from streamlit_app.core import get_state_manager
-        state = get_state_manager()
+        state = get_state_manager().get()
         if state.raw_data:
             return state.raw_data
     except ImportError:
@@ -245,7 +245,7 @@ def get_sync_status() -> Dict[str, Any]:
     v3_data = None
     try:
         from streamlit_app.core import get_state_manager
-        v3_data = get_state_manager().raw_data
+        v3_data = get_state_manager().get().raw_data
     except ImportError:
         pass
 
