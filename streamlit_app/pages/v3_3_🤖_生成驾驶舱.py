@@ -54,50 +54,6 @@ from streamlit_app.components import (
 
 logger = logging.getLogger(__name__)
 
-# === Header ===
-# v3.1: 版本徽章
-from streamlit_app.core.version_router import get_current_version
-from streamlit_app.components import render_version_badge
-render_version_badge(get_current_version())
-
-st.title("🤖 生成驾驶舱")
-st.caption("Step 3-7/7 · 7 步交互核心（LLM 润色 + 人工编辑）")
-st.divider()
-
-state_mgr = get_state_manager()
-state = state_mgr.get()
-
-# === 顶部步骤导航 ===
-sub_step = state.current_step if 3 <= state.current_step <= 7 else 3
-render_pipeline_stepper(current_step=sub_step, on_step_click=lambda n: _on_step_click(state_mgr, n))
-
-st.divider()
-
-# === 检查前置条件 ===
-if not state.raw_data or not state.mappings:
-    st.warning("⚠️ 请先完成 Step 1（数据）+ Step 2（映射）")
-    st.info("👈 请点击左侧菜单进入「📊 数据驾驶舱」")
-    st.stop()
-
-# === 子页面分发 ===
-if sub_step == 3:
-    _render_step_extract(state_mgr, state)
-elif sub_step == 4:
-    _render_step_polish(state_mgr, state)
-elif sub_step == 5:
-    _render_step_edit(state_mgr, state)
-elif sub_step == 6:
-    _render_step_render(state_mgr, state)
-elif sub_step == 7:
-    _render_step_audit(state_mgr, state)
-else:
-    st.error(f"❌ 未知步骤: {sub_step}")
-
-
-# ============================================================================
-# 回调
-# ============================================================================
-
 def _on_step_click(state_mgr, n: int) -> None:
     """点击步骤导航时的回调。"""
     if 3 <= n <= 7:
@@ -586,23 +542,47 @@ def _render_step_audit(state_mgr, state) -> None:
         st.rerun()
 
 
-# === 侧边栏 ===
-with st.sidebar:
-    st.header("🤖 生成驾驶舱")
-    st.caption(f"Step {sub_step}/7")
+# === Header ===
+# v3.1: 版本徽章
+from streamlit_app.core.version_router import get_current_version
+from streamlit_app.components import render_version_badge
+render_version_badge(get_current_version())
 
-    stats = state_mgr.get_stats()
-    if stats["total_slots"] > 0:
-        st.metric("段位", stats["total_slots"])
-        st.metric("已编辑", stats["edited_count"])
-        st.metric("Token", stats["total_tokens"])
+st.title("🤖 生成驾驶舱")
+st.caption("Step 3-7/7 · 7 步交互核心（LLM 润色 + 人工编辑）")
+st.divider()
 
-    st.divider()
-    st.caption("""
-    **流程**:
-    3. 槽位提取
-    4. LLM 润色
-    5. 人工编辑 ⭐
-    6. 模板渲染
-    7. 审计日志
-    """)
+state_mgr = get_state_manager()
+state = state_mgr.get()
+
+# === 顶部步骤导航 ===
+sub_step = state.current_step if 3 <= state.current_step <= 7 else 3
+render_pipeline_stepper(current_step=sub_step, on_step_click=lambda n: _on_step_click(state_mgr, n))
+
+st.divider()
+
+# === 检查前置条件 ===
+if not state.raw_data or not state.mappings:
+    st.warning("⚠️ 请先完成 Step 1（数据）+ Step 2（映射）")
+    st.info("👈 请点击左侧菜单进入「📊 数据驾驶舱」")
+    st.stop()
+
+# === 子页面分发 ===
+if sub_step == 3:
+    _render_step_extract(state_mgr, state)
+elif sub_step == 4:
+    _render_step_polish(state_mgr, state)
+elif sub_step == 5:
+    _render_step_edit(state_mgr, state)
+elif sub_step == 6:
+    _render_step_render(state_mgr, state)
+elif sub_step == 7:
+    _render_step_audit(state_mgr, state)
+else:
+    st.error(f"❌ 未知步骤: {sub_step}")
+
+
+# ============================================================================
+# 回调
+# ============================================================================
+
