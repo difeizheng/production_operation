@@ -88,28 +88,49 @@ def _render_step_extract(state_mgr, state) -> None:
     with col2:
         if st.button("🚀 开始提取", type="primary", use_container_width=True):
             _do_extract(state_mgr, state)
+            # 注意：_extract_done 必须在 _do_extract 内部设置，
+            # 因为 _do_extract 的 finally 块会调 st.rerun()，会中断当前脚本
+            # （caller 后续代码不会执行）
 
-    # 显示已提取结果
-    if state.slot_results:
+    # 显示上一次提取结果（跨 rerun 持久）
+    last_result = st.session_state.get("_last_extract_result")
+    if last_result:
+        if last_result["ok"]:
+            st.success(last_result["msg"])
+        else:
+            st.error(last_result["msg"])
+
+    # 显示已提取结果（关键修复：用 _extract_done 标记，不依赖 slot_results 是否空）
+    if st.session_state.get("_extract_done"):
         st.divider()
         st.subheader("📊 提取结果")
-        rows = []
-        for slot_id, info in state.slot_results.items():
-            rows.append({
-                "槽位": slot_id,
-                "状态": "✅ 已提取" if not info.get("is_empty") else "❌ 缺失",
-                "文本长度": info.get("text_length", 0),
-                "来源文件": info.get("source_file", ""),
-            })
-        import pandas as pd
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-        extracted = sum(1 for r in state.slot_results.values() if not r.get("is_empty"))
-        empty = len(state.slot_results) - extracted
-        st.metric("提取成功率", f"{extracted}/{len(state.slot_results)}", delta=f"-{empty} 缺失")
+        if not state.slot_results:
+            # 空槽位场景：无汇总表数据，但允许进入 Step 4（用 fallback）
+            st.info(
+                "📭 0 个槽位提取（无汇总表数据）。\n\n"
+                "**这没关系**——Step 4 会用 reason_map.json 里的 fallback_text + LLM 润色，"
+                "可以正常生成报告。"
+            )
+        else:
+            # 有数据的场景
+            rows = []
+            for slot_id, info in state.slot_results.items():
+                rows.append({
+                    "槽位": slot_id,
+                    "状态": "✅ 已提取" if not info.get("is_empty") else "❌ 缺失",
+                    "文本长度": info.get("text_length", 0),
+                    "来源文件": info.get("source_file", ""),
+                })
+            import pandas as pd
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+            extracted = sum(1 for r in state.slot_results.values() if not r.get("is_empty"))
+            empty = len(state.slot_results) - extracted
+            st.metric("提取成功率", f"{extracted}/{len(state.slot_results)}", delta=f"-{empty} 缺失")
 
         st.divider()
-        if st.button("➡️ 下一步：LLM 润色", type="primary"):
+        if st.button("➡️ 下一步：LLM 润色", type="primary", key="step3_next"):
             state_mgr.update_field(current_step=4)
             st.rerun()
 
@@ -121,7 +142,6 @@ def _do_extract(state_mgr, state) -> None:
             collector = ReasonCollector()
             summary_file = state.summary_path
             if not summary_file or not Path(summary_file).exists():
-                st.warning("⚠️ 无汇总表路径，将使用空提取")
                 slot_results = {}
             else:
                 slot_results, _ = collector.collect(summary_file)
@@ -137,10 +157,25 @@ def _do_extract(state_mgr, state) -> None:
                 }
 
             state_mgr.update_field(slot_results=serialized)
-            st.success(f"✅ 提取完成: {len(serialized)} 个槽位")
-            st.rerun()
+            # 把结果存到 session_state，rerun 后仍能显示
+            st.session_state["_last_extract_result"] = {
+                "ok": True,
+                "count": len(serialized),
+                "msg": f"✅ 提取完成: {len(serialized)} 个槽位",
+            }
+            # ⭐ 关键：必须在这里设置 _extract_done，因为 finally 里的 rerun
+            # 会中断 caller 的后续代码
+            st.session_state["_extract_done"] = True
         except Exception as e:
-            st.error(f"❌ 提取失败: {e}")
+            st.session_state["_last_extract_result"] = {
+                "ok": False,
+                "count": 0,
+                "msg": f"❌ 提取失败: {e}",
+            }
+            # 即使失败也标记已尝试（用户能看到结果并选择重试或继续）
+            st.session_state["_extract_done"] = True
+        finally:
+            st.rerun()
 
 
 # ============================================================================
@@ -152,9 +187,15 @@ def _render_step_polish(state_mgr, state) -> None:
     st.subheader("🤖 Step 4: LLM 润色")
     st.caption("使用 ReasonResolver 批量润色所有 15 个段位")
 
-    if not state.slot_results:
+    if not st.session_state.get("_extract_done"):
         st.warning("⚠️ 请先完成 Step 3 提取")
         st.stop()
+
+    # 关键修复：空 slot_results 不再阻塞（fallback 模式仍可走通）
+    if not state.slot_results:
+        st.info(
+            "📭 无汇总表槽位数据。将使用 fallback_text + LLM 润色（fallback 模式）。"
+        )
 
     # 全局调参
     with st.expander("⚙️ 全局调参", expanded=False):
@@ -267,7 +308,10 @@ def _do_polish(state_mgr, state, temperature: float, max_tokens: int, use_few_sh
                 )
                 for sid, info in state.slot_results.items()
             }
-            segments = resolver.resolve_all(data=state.raw_data)
+            segments = resolver.resolve_all(
+                summary_file=state.summary_path,  # ⭐ 必须传，否则 resolver 拿不到槽位
+                data=state.raw_data,
+            )
             for ph, seg in segments.items():
                 polished[ph] = PolishedSlot(
                     slot_id=seg.placeholder,  # 用 placeholder 当 slot_id
@@ -461,10 +505,21 @@ def _do_render(state_mgr, state, text_dict: Dict[str, str]) -> None:
                 st.error(f"❌ 模板不存在: {template_path}")
                 return
 
-            output_path = project_root / "archive" / "v3_interactive" / f"week{state.raw_data.get('meta', {}).get('week', 'unknown')}.docx"
+            # 演示数据没有 meta，回退到 report_period；再回退到 'unknown'
+            meta = state.raw_data.get("meta", {})
+            period = state.raw_data.get("report_period", {})
+            week = meta.get("week") or period.get("week") or "unknown"
+            output_path = project_root / "archive" / "v3_interactive" / f"week{week}.docx"
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            generator = ReportGeneratorV2(template_path=str(template_path))
+            # ⭐ 三重保护：显式 Path 转换、存在性检查、详细 traceback
+            # 1) 强制转 Path（不依赖 ReportGeneratorV2 内部处理）
+            template_path_obj = Path(str(template_path))
+            if not template_path_obj.exists():
+                st.error(f"❌ 模板路径无效: {template_path_obj}")
+                return
+
+            generator = ReportGeneratorV2(template_path=template_path_obj)
             generator.render(
                 output_path=str(output_path),
                 text_dict=text_dict,
@@ -474,7 +529,12 @@ def _do_render(state_mgr, state, text_dict: Dict[str, str]) -> None:
             st.success(f"✅ 渲染完成: {output_path.name}")
             st.rerun()
         except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            # 关键：暴露完整 traceback 而不是 str(e)
             st.error(f"❌ 渲染失败: {e}")
+            with st.expander("🔍 查看详细错误", expanded=False):
+                st.code(tb, language="text")
 
 
 # ============================================================================

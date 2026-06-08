@@ -52,6 +52,8 @@ from .stepper import (
     render_stepper,
 )
 from .data_preview import (
+    SKIP_KEYS,
+    _flatten_to_leaves,
     categorize_field,
     detect_anomalies,
     render_excel_preview,
@@ -120,6 +122,8 @@ __all__ = [
     "detect_anomalies",
     "render_excel_preview",
     "render_kpi_overview",
+    "_flatten_to_leaves",
+    "SKIP_KEYS",
     "compute_diff_stats",
     "extract_numbers",
     "highlight_numbers",

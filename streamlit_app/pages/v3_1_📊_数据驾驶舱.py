@@ -188,6 +188,8 @@ else:
             data = collect_summary_data(tmp_summary)
             if data:
                 st.session_state["_summary_data"] = data
+                # ⭐ 关键：把 summary_path 写入 state，否则 Step 4 拿不到
+                state_mgr.update_field(summary_path=str(tmp_summary))
                 st.success(f"✅ 汇总表采集完成（{len(data)} 个字段）")
 
 st.divider()
@@ -196,7 +198,7 @@ st.divider()
 data = st.session_state.get("_analysis_data")
 if data:
     st.subheader("2️⃣ 字段预览")
-    render_excel_preview(data, title="综合分析表（186 字段）")
+    render_excel_preview(data, title="综合分析表")
 
     st.divider()
 

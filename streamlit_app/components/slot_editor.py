@@ -82,7 +82,12 @@ def render_params_panel(
 
     Returns:
         用户调整后的 LLMCallParams
+
+    设计要点：两个 expander 必须**平行**（不能嵌套），否则违反 Streamlit 限制。
+    Streamlit 不允许在 expander 内嵌另一个 expander——v3.0 上线时埋了这个 bug，
+    当时没人走到 Step 5 没暴露。
     """
+    # 第一个 expander：基本调参
     with st.expander("⚙️ 调参面板（高级）", expanded=False):
         col1, col2 = st.columns(2)
 
@@ -119,29 +124,31 @@ def render_params_panel(
                 help="如：qwen3.5-plus / claude-sonnet-4-6",
             )
 
-        with st.expander("🛠️ 自定义 Prompt（可选）", expanded=False):
-            custom_system = st.text_area(
-                "System Prompt",
-                value=default_params.custom_system_prompt or "",
-                height=100,
-                key=f"{key}_custom_system",
-                help="覆盖默认 system prompt（高级）",
-            )
-            custom_user = st.text_area(
-                "User Prompt（{raw_text} 会被替换为原始文本）",
-                value=default_params.custom_user_prompt or "",
-                height=100,
-                key=f"{key}_custom_user",
-            )
-
-        return LLMCallParams(
-            temperature=temperature,
-            max_tokens=max_tokens,
-            model_name=model_name if model_name else None,
-            use_few_shot=use_few_shot,
-            custom_system_prompt=custom_system if custom_system else None,
-            custom_user_prompt=custom_user if custom_user else None,
+    # 第二个 expander：自定义 Prompt（必须平行，不能嵌在第一个里）
+    with st.expander("🛠️ 自定义 Prompt（可选）", expanded=False):
+        custom_system = st.text_area(
+            "System Prompt",
+            value=default_params.custom_system_prompt or "",
+            height=100,
+            key=f"{key}_custom_system",
+            help="覆盖默认 system prompt（高级）",
         )
+        custom_user = st.text_area(
+            "User Prompt（{raw_text} 会被替换为原始文本）",
+            value=default_params.custom_user_prompt or "",
+            height=100,
+            key=f"{key}_custom_user",
+        )
+
+    # return 提到 expander 外部（两个 expander 都已关闭后再 return）
+    return LLMCallParams(
+        temperature=temperature,
+        max_tokens=max_tokens,
+        model_name=model_name if model_name else None,
+        use_few_shot=use_few_shot,
+        custom_system_prompt=custom_system if custom_system else None,
+        custom_user_prompt=custom_user if custom_user else None,
+    )
 
 
 # ============================================================================

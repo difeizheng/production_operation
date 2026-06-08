@@ -57,11 +57,13 @@ class ReportGeneratorV2:
 
         Args:
             output_dir: 输出目录
-            template_path: 自定义模板路径
+            template_path: 自定义模板路径（接受 Path 或 str，内部统一转 Path）
         """
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.template_path = template_path or DEFAULT_TEMPLATE
+        # ⭐ 关键修复：兼容 str 和 Path 两种输入（之前 str 会被存为 self.template_path
+        # 导致 .exists() 调用失败）
+        self.template_path = Path(template_path) if template_path else DEFAULT_TEMPLATE
 
         if not self.template_path.exists():
             raise FileNotFoundError(
@@ -190,6 +192,100 @@ class ReportGeneratorV2:
         # 当前不做后处理（占位）
         # 实际生产中应在模板中预定义表格位置，或用 subdoc 模式
         pass
+
+    def render(
+        self,
+        output_path: str,
+        text_dict: Dict[str, str],
+        data: Dict[str, Any],
+    ) -> str:
+        """v3 时代简化的渲染入口（v3.3 页面调用）。
+
+        接受已经抛光好的 placeholder → final_text 字典（v3 Step 4-5 产出），
+        直接渲染模板到 output_path，跳过 v2 的 ReasonResolver 流程。
+
+        Args:
+            output_path: 完整输出路径（含文件名和 .docx 后缀）
+            text_dict: 占位符 → 文本 字典（已含 LLM 润色/人工编辑）
+            data: 综合分析表数据（用于填充表格/标题等结构化变量）
+
+        Returns:
+            实际写入的文件路径（字符串）
+        """
+        from docxtpl import DocxTemplate
+
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 构建 Jinja2 上下文：基础变量 + text_dict 覆盖
+        context = self._build_context_v3(data, text_dict)
+
+        # 渲染
+        tpl = DocxTemplate(str(self.template_path))
+        tpl.render(context)
+
+        # 保存
+        tpl.save(str(output_path))
+        logger.info("✅ 报告已生成: %s", output_path)
+        return str(output_path)
+
+    def _build_context_v3(
+        self,
+        data: Dict[str, Any],
+        text_dict: Dict[str, str],
+    ) -> Dict[str, Any]:
+        """v3 简化的上下文构建（无需 reason_text/ResolvedSegment）。
+
+        Args:
+            data: 综合分析表数据
+            text_dict: 占位符 → final_text 字典（已抛光）
+
+        Returns:
+            Jinja2 渲染上下文
+        """
+        from scripts.prepare_table_templates import build_sales_rows, build_spot_rows
+
+        # 优先用 report_period，回退到 meta
+        period = data.get("report_period", data.get("meta", {}))
+        start_date = period.get("start_date", "")
+        end_date = period.get("end_date", "")
+        year = period.get("year", 2026)
+        week = period.get("week", 1)
+
+        context: Dict[str, Any] = {
+            "title": "市场营销部汇报材料",
+            "year": year,
+            "week": week,
+            "date_range": f"（{start_date}-{end_date}）" if start_date and end_date else "",
+            "dom_overview": "",
+        }
+
+        # 表格数据
+        context.update(build_sales_rows(data))
+        context.update(build_spot_rows(data))
+
+        # 把 text_dict 的 {{ xxx }} 占位符直接注入（去掉花括号便于 docxtpl 查找）
+        for placeholder, text in text_dict.items():
+            # placeholder 形如 "{{ v4_P6_dom_elec_yoy_wow }}"，去掉花括号
+            key = placeholder.replace("{{", "").replace("}}", "").strip()
+            context[key] = text
+
+        # 兜底：所有 v4_P* 占位符都至少给个默认值（防止模板渲染失败）
+        default_keys = [
+            "v4_P5_overview", "v4_P6_dom_elec_yoy_wow",
+            "v4_P11_dom_price_yoy", "v4_P12_dom_price_wow",
+            "v4_P13_hydro_price_wow", "v4_P14_wind_price_wow",
+            "v4_P15_solar_price_wow", "v4_P16_thermal_price_wow",
+            "v4_P18_dom_revenue",
+            "v4_P20_intl_price_yoy", "v4_P21_intl_price_wow",
+            "v4_P23_market_hydro", "v4_P24_market_new_energy",
+            "v4_P25_market_thermal", "v4_P27_green_cert",
+        ]
+        for k in default_keys:
+            if k not in context:
+                context[k] = "（待补充）"
+
+        return context
 
 
 # ============================================================================
