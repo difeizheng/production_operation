@@ -187,6 +187,7 @@ class ReasonPolisher:
         raw_text: str,
         context: Optional[Dict[str, Any]] = None,
         max_length: Optional[int] = None,
+        slot: Optional[Any] = None,
     ) -> PolishResult:
         """润色单段文本。
 
@@ -194,6 +195,7 @@ class ReasonPolisher:
             raw_text: 原始叙述（来自 Excel）
             context: 上下文数据（可选，仅用于参考格式）
             max_length: 覆盖默认的最大长度
+            slot: PolishedSlot 实例（可选，用于智能 few-shot 选择）
 
         Returns:
             PolishResult
@@ -239,7 +241,7 @@ class ReasonPolisher:
 
         # 4. 调用 LLM
         try:
-            polished, tokens = self._call_llm(raw_text, context, max_len)
+            polished, tokens = self._call_llm(raw_text, context, max_len, slot=slot)
         except Exception as e:
             logger.error("LLM 调用失败: %s", e)
             return PolishResult(
@@ -300,8 +302,16 @@ class ReasonPolisher:
         raw_text: str,
         context: Dict[str, Any],
         max_length: int,
+        slot: Optional[Any] = None,
     ) -> Tuple[str, int]:
-        """调用 LLM（通过统一工厂，支持 Anthropic/Qwen/OpenAI/DeepSeek）。"""
+        """调用 LLM（通过统一工厂，支持 Anthropic/Qwen/OpenAI/DeepSeek）。
+
+        Args:
+            raw_text: 原始文本
+            context: 上下文数据
+            max_length: 最大长度
+            slot: PolishedSlot 实例（可选，用于智能 few-shot 选择）
+        """
         assert self._client is not None
 
         # 构建上下文提示（不强制 LLM 用，仅作参考）
@@ -314,12 +324,20 @@ class ReasonPolisher:
             context_hint=context_hint or "（无）",
         )
 
-        # Few-shot 注入到 system
-        few_shot_text = "\n\n".join(
-            f"【示例 {i+1}】\n原始：{ex['raw']}\n改写：{ex['polished']}"
-            for i, ex in enumerate(FEW_SHOT_EXAMPLES)
-        )
-        system_with_examples = POLISH_SYSTEM_PROMPT + "\n\n【改写示例】\n" + few_shot_text
+        # Phase 3: 智能 few-shot 注入（如果提供了 slot）
+        if slot is not None:
+            try:
+                from streamlit_app.core.few_shot_engine import inject_few_shot_into_system
+                system_with_examples = inject_few_shot_into_system(
+                    POLISH_SYSTEM_PROMPT, slot, top_k=2
+                )
+                logger.debug("Smart few-shot injected for slot %s", getattr(slot, 'slot_id', '?'))
+            except ImportError:
+                logger.warning("few_shot_engine not available, falling back to hardcoded examples")
+                system_with_examples = self._build_fallback_few_shot()
+        else:
+            # 降级：使用硬编码示例
+            system_with_examples = self._build_fallback_few_shot()
 
         # 使用统一接口（支持所有 provider）
         response = call_llm(
@@ -344,6 +362,17 @@ class ReasonPolisher:
             polished = self._extract_polished_from_text(content_text)
 
         return polished, tokens
+
+    def _build_fallback_few_shot(self) -> str:
+        """构建降级 few-shot（硬编码示例）。
+
+        当 few_shot_engine 不可用或未提供 slot 时使用。
+        """
+        few_shot_text = "\n\n".join(
+            f"【示例 {i+1}】\n原始：{ex['raw']}\n改写：{ex['polished']}"
+            for i, ex in enumerate(FEW_SHOT_EXAMPLES)
+        )
+        return POLISH_SYSTEM_PROMPT + "\n\n【改写示例】\n" + few_shot_text
 
     @staticmethod
     def _extract_polished_from_text(text: str) -> str:

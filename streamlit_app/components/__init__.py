@@ -95,6 +95,23 @@ from .quality_summary import (
     render_quality_summary,
 )
 
+# v3.3 新增（Phase 3 审计驾驶舱）
+from .audit_timeline import (
+    TimelineEvent,
+    extract_timeline_events,
+    group_events_by_stage,
+    compute_stage_stats,
+    render_audit_timeline,
+)
+from .edit_history import (
+    DiffResult,
+    compute_similarity,
+    compute_diff,
+    compute_edit_chain,
+    render_diff_block,
+    render_edit_diff,
+)
+
 __all__ = [
     # KPI
     "kpi_card",
@@ -161,4 +178,16 @@ __all__ = [
     "render_quality_score_table",
     "VERDICT_BADGE",
     "render_quality_summary",
+    # v3.3 新增（Phase 3 审计驾驶舱）
+    "TimelineEvent",
+    "extract_timeline_events",
+    "group_events_by_stage",
+    "compute_stage_stats",
+    "render_audit_timeline",
+    "DiffResult",
+    "compute_similarity",
+    "compute_diff",
+    "compute_edit_chain",
+    "render_diff_block",
+    "render_edit_diff",
 ]
