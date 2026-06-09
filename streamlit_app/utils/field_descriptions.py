@@ -42,10 +42,52 @@ UNIT_SUFFIX_MAP: List[Tuple[str, str]] = [
 
 
 def _extract_unit(leaf_name: str) -> str:
-    """从字段名后缀推断单位。"""
+    """从字段名后缀推断单位。
+
+    v3.2 增强：除了 UNIT_SUFFIX_MAP 后缀匹配，还支持 leaf_name 关键词推断
+    （针对 price_change / share_impact / combined_impact 等没有标准后缀的字段）
+    """
     name_lower = leaf_name.lower()
+
+    # 1. 后缀匹配（最优先）
     for suffix, unit in UNIT_SUFFIX_MAP:
         if name_lower.endswith(suffix):
+            return unit
+
+    # 2. v3.2 关键词推断（针对 yoy/wow 分析的细分字段）
+    if "price" in name_lower and "change" in name_lower:
+        return "元/千瓦时"  # 电价同比/环比变化
+    if "price" in name_lower and "impact" in name_lower:
+        return "元/千瓦时"  # 电价影响
+    if "share" in name_lower and "change" in name_lower:
+        return "%"  # 占比变化
+    if "share" in name_lower and "impact" in name_lower:
+        return "元/千瓦时"  # 占比对电价的影响
+    if "cross_impact" in name_lower or "combined_impact" in name_lower:
+        return "元/千瓦时"  # 交叉影响 / 量价合计影响
+
+    return ""
+
+
+def _extract_unit_hint(path_normalized: str) -> str:
+    """v3.2 新增：按路径前缀匹配单位 hint。
+
+    用于"采集器路径"（domestic.electricity.hydro 等没有单位后缀的路径）。
+
+    优先级（长的前缀优先匹配）：
+    - domestic.electricity → 万千瓦时
+    - domestic.price → 元/千瓦时
+    - domestic.revenue → 万元
+    - ...
+
+    Args:
+        path_normalized: 标准化后的路径（数组下标已转换）
+
+    Returns:
+        单位字符串，未匹配返回 ""
+    """
+    for prefix, unit in UNIT_HINT_MAP:
+        if path_normalized == prefix or path_normalized.startswith(prefix + "."):
             return unit
     return ""
 
@@ -56,6 +98,7 @@ def _extract_unit(leaf_name: str) -> str:
 CATEGORY_ZH = {
     "hydro": "水电",
     "renewables": "新能源",
+    "new_energy": "新能源",  # v3.2: 采集器原始命名
     "thermal": "火电",
     "wind": "风电",
     "solar": "光伏",
@@ -101,7 +144,9 @@ ENV_ASSET_ZH = {
     "ccer": "CCER",
 }
 
+# v3.2 新增：AnalysisCollector 原始数据路径的 section 翻译
 SECTION_ZH = {
+    # 业务标准 section
     "group_total": "集团汇总",
     "by_category": "按品类",
     "by_region": "按省份",
@@ -112,7 +157,71 @@ SECTION_ZH = {
     "market_trading": "市场化交易",
     "environmental_assets": "环境资产",
     "report_period": "报告期",
+    "report_table_1": "报告表1",
+    "organizations": "组织",
+    "ui_view": "UI视图",
+    "validation_report": "验证报告",
+    # 采集器原始 section（v3.2 新增）
+    "domestic": "国内",
+    "international_raw": "国际（原始）",
+    "electricity": "电量",
+    "price": "电价",
+    "revenue": "收入",
+    "yoy": "同比",
+    "wow": "环比",
+    "share": "电量占比",
+    "prev_year_electricity": "去年同期电量",
+    "prev_year_price": "去年同期电价",
+    "prev_year_revenue": "去年同期收入",
+    "prev_year_share": "去年同期占比",
+    "last_week_electricity": "上周电量",
+    "last_week_price": "上周电价",
+    "last_week_revenue": "上周收入",
+    "last_week_share": "上周占比",
 }
+
+# v3.2 新增：单位 hint（按路径前缀匹配）
+# 用于给"采集器原始路径"补充单位信息
+# 路径前缀（越长越具体）→ 单位
+UNIT_HINT_MAP: List[Tuple[str, str]] = [
+    # 具体单位（长前缀优先）
+    ("domestic.electricity", "万千瓦时"),
+    ("domestic.price", "元/千瓦时"),
+    ("domestic.revenue", "万元"),
+    ("domestic.share", "%"),
+    ("domestic.yoy.electricity", "%"),
+    ("domestic.yoy.revenue", "%"),
+    ("domestic.yoy.price_change", "元/千瓦时"),
+    ("domestic.yoy.price_impact", "元/千瓦时"),
+    ("domestic.yoy.share_impact", "元/千瓦时"),
+    ("domestic.yoy.cross_impact", "元/千瓦时"),
+    ("domestic.yoy.combined_impact", "元/千瓦时"),
+    ("domestic.yoy.share_change", "%"),
+    ("domestic.wow.electricity", "%"),
+    ("domestic.wow.revenue", "%"),
+    ("domestic.wow.price_change", "元/千瓦时"),
+    ("domestic.wow.price_impact", "元/千瓦时"),
+    ("domestic.wow.share_impact", "元/千瓦时"),
+    ("domestic.wow.cross_impact", "元/千瓦时"),
+    ("domestic.wow.combined_impact", "元/千瓦时"),
+    ("domestic.wow.share_change", "%"),
+    ("domestic.prev_year_electricity", "万千瓦时"),
+    ("domestic.prev_year_price", "元/千瓦时"),
+    ("domestic.prev_year_revenue", "万元"),
+    ("domestic.prev_year_share", "%"),
+    ("domestic.last_week_electricity", "万千瓦时"),
+    ("domestic.last_week_price", "元/千瓦时"),
+    ("domestic.last_week_revenue", "万元"),
+    ("domestic.last_week_share", "%"),
+    # 国际（注意：AnalysisCollector 国际数据原始单位也是万千瓦时/万元）
+    ("international.electricity", "万千瓦时"),
+    ("international.price", "元/千瓦时"),
+    ("international.revenue", "万元"),
+    ("international.yoy.electricity", "%"),
+    ("international.yoy.price_change", "元/千瓦时"),
+    ("international.wow.electricity", "%"),
+    ("international.wow.price_change", "元/千瓦时"),
+]
 
 
 def _translate_subsection(
@@ -124,6 +233,11 @@ def _translate_subsection(
         - by_category.X.Y → 翻译 X（水电/火电等），返回 ("水电", [Y])
         - by_country_category[0].X → 数组下标不翻译，返回 ("国家[0]", [X])
         - exchange_rates.CNY_USD.X → 翻译货币对
+        - v3.2 新增：采集器路径递归翻译
+          domestic.electricity.hydro → 递归处理
+            ("国内", ["electricity", "hydro"])
+            → ("国内·电量", ["hydro"])
+            → ("国内·电量·水电", [])
     """
     if not parts:
         return "", parts
@@ -147,6 +261,21 @@ def _translate_subsection(
         return f"{cat_zh}市场化", parts[1:]
     if section == "environmental_assets":
         return ENV_ASSET_ZH.get(first, first), parts[1:]
+
+    # v3.2 新增：品类在所有 section 下都翻译
+    # 这样 domestic.electricity.hydro 第二次递归时能识别 "hydro" → "水电"
+    if first in CATEGORY_ZH:
+        return CATEGORY_ZH[first], parts[1:]
+
+    # v3.2 新增：通用递归翻译
+    # 如果 first 在 SECTION_ZH 中（采集器 section），先翻译 first，再递归处理剩余
+    if first in SECTION_ZH and first != section:
+        sub_zh = SECTION_ZH[first]
+        # 递归处理剩余部分（用 first 作为新 section）
+        inner_zh, inner_remaining = _translate_subsection(first, parts[1:])
+        if inner_zh:
+            return f"{sub_zh}·{inner_zh}", inner_remaining
+        return sub_zh, parts[1:]
 
     # 未识别的 section：不翻译
     return "", parts
@@ -191,7 +320,15 @@ LEAF_KEYWORD_ZH: List[Tuple[str, str]] = [
     ("yoy", "同比"),
     ("wow", "环比"),
     ("mom", "环比"),
+    # v3.2 新增：yoy/wow 归因分析字段
+    ("combined_impact", "量价合计影响"),
+    ("price_impact", "电价影响"),
+    ("share_impact", "占比影响"),
+    ("cross_impact", "交叉影响"),
+    ("price_change", "电价变化"),
+    ("share_change", "占比变化"),
     # 单关键词
+    ("total", "合计"),
     ("volume", "上网电量"),
     ("revenue", "发电收入"),
     ("price", "电价"),
@@ -463,6 +600,156 @@ CURATED_OVERRIDES: Dict[str, Dict[str, str]] = {
         "description_zh": "CCER 累计成交均价",
         "unit": "元/吨",
     },
+    # === 按省份（4 省 × 4 字段 = 16 条）===
+    "by_region.hubei.yoy_price_change_fen": {
+        "description_zh": "湖北电价同比变化",
+        "unit": "分",
+    },
+    "by_region.hubei.mom_price_change_fen": {
+        "description_zh": "湖北电价环比变化",
+        "unit": "分",
+    },
+    "by_region.hubei.long_term_position_pct": {
+        "description_zh": "湖北长期合约持仓",
+        "unit": "%",
+    },
+    "by_region.hubei.spot_avg_price_yuan": {
+        "description_zh": "湖北现货均价",
+        "unit": "元/千瓦时",
+    },
+    "by_region.shandong.yoy_price_change_fen": {
+        "description_zh": "山东电价同比变化",
+        "unit": "分",
+    },
+    "by_region.shandong.mom_price_change_fen": {
+        "description_zh": "山东电价环比变化",
+        "unit": "分",
+    },
+    "by_region.shandong.long_term_position_pct": {
+        "description_zh": "山东长期合约持仓",
+        "unit": "%",
+    },
+    "by_region.shandong.spot_avg_price_yuan": {
+        "description_zh": "山东现货均价",
+        "unit": "元/千瓦时",
+    },
+    "by_region.shaanxi.yoy_price_change_fen": {
+        "description_zh": "陕西电价同比变化",
+        "unit": "分",
+    },
+    "by_region.shaanxi.mom_price_change_fen": {
+        "description_zh": "陕西电价环比变化",
+        "unit": "分",
+    },
+    "by_region.shaanxi.long_term_position_pct": {
+        "description_zh": "陕西长期合约持仓",
+        "unit": "%",
+    },
+    "by_region.shaanxi.spot_avg_price_yuan": {
+        "description_zh": "陕西现货均价",
+        "unit": "元/千瓦时",
+    },
+    "by_region.jiangsu.yoy_price_change_fen": {
+        "description_zh": "江苏电价同比变化",
+        "unit": "分",
+    },
+    "by_region.jiangsu.mom_price_change_fen": {
+        "description_zh": "江苏电价环比变化",
+        "unit": "分",
+    },
+    "by_region.jiangsu.long_term_position_pct": {
+        "description_zh": "江苏长期合约持仓",
+        "unit": "%",
+    },
+    "by_region.jiangsu.spot_avg_price_yuan": {
+        "description_zh": "江苏现货均价",
+        "unit": "元/千瓦时",
+    },
+    # === 按公司（3 公司 × 7 字段 = 21 条）===
+    "by_company.three_gorges_intl.name": {
+        "description_zh": "三峡国际",
+        "unit": "",
+    },
+    "by_company.three_gorges_intl.yoy_change_fen": {
+        "description_zh": "三峡国际电价同比变化",
+        "unit": "分",
+    },
+    "by_company.three_gorges_intl.mom_change_fen": {
+        "description_zh": "三峡国际电价环比变化",
+        "unit": "分",
+    },
+    "by_company.three_gorges_intl.yoy_real_business_fen": {
+        "description_zh": "三峡国际真本事同比变化",
+        "unit": "分",
+    },
+    "by_company.three_gorges_intl.mom_real_business_fen": {
+        "description_zh": "三峡国际真本事环比变化",
+        "unit": "分",
+    },
+    "by_company.three_gorges_intl.group_impact_yoy_fen": {
+        "description_zh": "三峡国际对集团同比影响",
+        "unit": "分",
+    },
+    "by_company.three_gorges_intl.group_impact_mom_fen": {
+        "description_zh": "三峡国际对集团环比影响",
+        "unit": "分",
+    },
+    "by_company.cyg_intl.name": {
+        "description_zh": "长江电力国际",
+        "unit": "",
+    },
+    "by_company.cyg_intl.yoy_change_fen": {
+        "description_zh": "长江电力国际电价同比变化",
+        "unit": "分",
+    },
+    "by_company.cyg_intl.mom_change_fen": {
+        "description_zh": "长江电力国际电价环比变化",
+        "unit": "分",
+    },
+    "by_company.cyg_intl.yoy_real_business_fen": {
+        "description_zh": "长江电力国际真本事同比变化",
+        "unit": "分",
+    },
+    "by_company.cyg_intl.mom_real_business_fen": {
+        "description_zh": "长江电力国际真本事环比变化",
+        "unit": "分",
+    },
+    "by_company.cyg_intl.group_impact_yoy_fen": {
+        "description_zh": "长江电力国际对集团同比影响",
+        "unit": "分",
+    },
+    "by_company.cyg_intl.group_impact_mom_fen": {
+        "description_zh": "长江电力国际对集团环比影响",
+        "unit": "分",
+    },
+    "by_company.hubei_energy.name": {
+        "description_zh": "湖北能源",
+        "unit": "",
+    },
+    "by_company.hubei_energy.yoy_change_fen": {
+        "description_zh": "湖北能源电价同比变化",
+        "unit": "分",
+    },
+    "by_company.hubei_energy.mom_change_fen": {
+        "description_zh": "湖北能源电价环比变化",
+        "unit": "分",
+    },
+    "by_company.hubei_energy.yoy_real_business_fen": {
+        "description_zh": "湖北能源真本事同比变化",
+        "unit": "分",
+    },
+    "by_company.hubei_energy.mom_real_business_fen": {
+        "description_zh": "湖北能源真本事环比变化",
+        "unit": "分",
+    },
+    "by_company.hubei_energy.group_impact_yoy_fen": {
+        "description_zh": "湖北能源对集团同比影响",
+        "unit": "分",
+    },
+    "by_company.hubei_energy.group_impact_mom_fen": {
+        "description_zh": "湖北能源对集团环比影响",
+        "unit": "分",
+    },
 }
 
 
@@ -502,9 +789,9 @@ def describe_field(path: str) -> Dict[str, str]:
     # 2b. 翻译子节
     sub_zh, remaining = _translate_subsection(section, sub_parts)
 
-    # 2c. 提取单位
+    # 2c. 提取单位（v3.2：先查路径前缀 hint，再 fallback 到 leaf 后缀）
     leaf_name = remaining[-1] if remaining else section
-    unit = _extract_unit(leaf_name)
+    unit = _extract_unit_hint(path_normalized) or _extract_unit(leaf_name)
 
     # 2d. 提取业务含义
     meaning = _extract_meaning(leaf_name)
@@ -513,11 +800,15 @@ def describe_field(path: str) -> Dict[str, str]:
     parts_zh: List[str] = []
     if sub_zh:
         parts_zh.append(sub_zh)
-    if meaning:
-        parts_zh.append(meaning)
-    elif leaf_name and leaf_name not in (sub_zh,):
-        # 推断不出含义时，保留原字段名（避免信息丢失）
-        parts_zh.append(leaf_name)
+
+    # v3.2 修复：只有 remaining 还有内容时才追加 leaf 含义
+    # 否则会出现 "环比·电量·domestic"（leaf_name 重复 section 名）
+    if remaining:
+        if meaning:
+            parts_zh.append(meaning)
+        elif leaf_name and leaf_name not in (sub_zh,):
+            # 推断不出含义时，保留原字段名（避免信息丢失）
+            parts_zh.append(leaf_name)
 
     desc = "·".join(parts_zh) if parts_zh else path
 
@@ -525,7 +816,7 @@ def describe_field(path: str) -> Dict[str, str]:
     if not sub_zh and not meaning:
         section_zh = SECTION_ZH.get(section, section)
         if section_zh and section_zh not in desc:
-            desc = f"{section_zh}·{leaf_name}" if leaf_name else section_zh
+            desc = f"{section_zh}·{leaf_name}" if leaf_name and leaf_name != section else section_zh
 
     # 加上单位（如果有）
     if unit and unit not in desc:

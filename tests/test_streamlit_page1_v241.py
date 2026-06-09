@@ -16,7 +16,11 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 PROJECT_ROOT = Path(__file__).parent.parent
-PAGE_1 = PROJECT_ROOT / "streamlit_app" / "pages" / "1_🏠_国内分析.py"
+# v3.1 重命名：1_🏠_国内分析.py → v2_1_🏠_国内分析.py
+# 兼容老路径（如果存在）
+PAGE_1_OLD = PROJECT_ROOT / "streamlit_app" / "pages" / "1_🏠_国内分析.py"
+PAGE_1 = PROJECT_ROOT / "streamlit_app" / "pages" / "v2_1_🏠_国内分析.py"
+PAGE_1 = PAGE_1 if PAGE_1.exists() else PAGE_1_OLD
 
 
 def _safe(s: str) -> str:

@@ -73,7 +73,17 @@ def _render_step_extract(state_mgr, state) -> None:
     # 检查汇总表路径
     if not state.summary_path:
         st.warning("⚠️ 未提供汇总表路径，将使用 fallback 模式")
-        st.info("提示：可返回 Step 1 上传汇总表")
+        st.info("提示：可返回 Step 1 上传汇总表，或继续走 fallback 模式生成报告。")
+
+    # 增强警告：未提供汇总表 + Step 2 未配置映射
+    if not state.summary_path and not (state.mappings or []):
+        st.error(
+            "❌ **数据严重不足**：未提供汇总表 + Step 2 未配置字段映射\n\n"
+            "将完全依赖 fallback_text，**所有 15 段都会是 fallback 模式**。\n\n"
+            "**强烈建议**：\n"
+            "1. 返回 Step 1 上传汇总表（最有效）\n"
+            "2. 或返回 Step 2 手工配置字段映射"
+        )
 
     col1, col2 = st.columns([2, 1])
     with col1:
@@ -205,6 +215,11 @@ def _render_step_polish(state_mgr, state) -> None:
         max_tokens = col2.slider("📏 最大 Token", 50, 2000, 500, 50)
         use_few_shot = st.checkbox("💡 启用 Few-shot")
 
+    # === 实时预览（单段调试）===
+    with st.expander("🔍 实时预览（单段 LLM 改写）", expanded=False):
+        st.caption("选择一个段位，使用上方参数立即预览 LLM 改写效果（不影响批量结果）")
+        _render_realtime_preview(state, temperature, max_tokens, use_few_shot)
+
     st.divider()
 
     col1, col2 = st.columns([3, 1])
@@ -245,6 +260,40 @@ def _render_step_polish(state_mgr, state) -> None:
         col1.metric("已润色", polished)
         col2.metric("Fallback", fallback)
         col3.metric("总 Token", total_tokens)
+
+        # === 关键修复：全部 fallback 检测 + 强制继续 ===
+        total_slots = len(state.polished_slots)
+        if total_slots > 0 and fallback == total_slots:
+            st.error(
+                f"⚠️ **所有 {total_slots} 段都是 fallback 模式**（无 LLM 润色）\n\n"
+                "报告质量可能很差（完全依赖 reason_map.json 里的静态文本）。\n\n"
+                "**建议**：\n"
+                "1. ⬅️ 返回 Step 1 上传汇总表（最有效）\n"
+                "2. 或继续到 Step 5 逐段人工编辑\n"
+                "3. 或点击「强制继续」忽略警告直接到 Step 5"
+            )
+            if not st.session_state.get("_force_continue_fallback"):
+                col_warn1, col_warn2 = st.columns(2)
+                with col_warn1:
+                    if st.button("⬅️ 返回 Step 1 上传汇总表", use_container_width=True):
+                        state_mgr.update_field(current_step=1)
+                        st.rerun()
+                with col_warn2:
+                    if st.button("⚠️ 强制继续（忽略警告）", key="force_continue_btn", use_container_width=True):
+                        st.session_state["_force_continue_fallback"] = True
+                        st.rerun()
+                # 在用户明确选择前阻止继续
+                if not st.button("🔓 暂时跳过，继续到 Step 5", key="skip_fallback_check", use_container_width=True):
+                    st.stop()
+                st.session_state["_force_continue_fallback"] = True
+                st.rerun()
+        elif total_slots > 0 and fallback > 0:
+            ratio = fallback / total_slots
+            st.warning(
+                f"⚠️ **{fallback}/{total_slots} 段是 fallback 模式**（{ratio:.0%}）\n\n"
+                "**建议**：在 Step 5 人工编辑这些段落，补充关键数据。\n\n"
+                f"（{total_slots - fallback} 段已 LLM 润色，质量较好）"
+            )
 
         st.divider()
         col1, col2 = st.columns(2)
@@ -348,6 +397,260 @@ def _do_polish(state_mgr, state, temperature: float, max_tokens: int, use_few_sh
     progress.empty()
     st.success(f"✅ 润色完成: {len(polished)} 个段位")
     st.rerun()
+
+
+# ============================================================================
+# 实时预览（Step 4 内的单段调试工具）
+# ============================================================================
+
+def _render_realtime_preview(state, temperature: float, max_tokens: int, use_few_shot: bool) -> None:
+    """实时预览单个段位的 LLM 改写效果。
+
+    用户在 expander 内：
+    1. 选择段位（来自 state.mappings）
+    2. 点击「✨ 预览」→ 调用 ReasonResolver 单独处理这一段
+    3. 查看原文 vs LLM 输出的对比
+    4. 选择「✅ 应用到正式结果」→ 写入 state.polished_slots
+    """
+    if not state.mappings:
+        st.info("📭 暂无可预览的段位（需先在 Step 2 配置映射）")
+        return
+
+    # 段位选择器
+    mapping_options = []
+    for i, m in enumerate(state.mappings):
+        ph = m.get("template_placeholder", f"unknown_{i}")
+        mode = m.get("generation_mode", "extract")
+        mapping_options.append((i, ph, mode))
+
+    if not mapping_options:
+        st.info("📭 mappings 列表为空")
+        return
+
+    # 用 placeholder 作 value，便于 selectbox 直接定位
+    selected_label = st.selectbox(
+        "选择段位",
+        options=[ph for _, ph, _ in mapping_options],
+        key="realtime_preview_select",
+    )
+    selected_idx = next(
+        (i for i, ph, _ in mapping_options if ph == selected_label), 0
+    )
+    selected_mapping = state.mappings[selected_idx]
+
+    # 显示当前段位信息
+    info_col1, info_col2 = st.columns(2)
+    info_col1.markdown(f"**段位**: `{selected_mapping.get('template_placeholder', '?')}`")
+    info_col1.markdown(f"**模式**: `{selected_mapping.get('generation_mode', 'extract')}`")
+    info_col2.markdown(f"**Source Slots**: {len(selected_mapping.get('source_slots', []))}")
+
+    # 预览按钮
+    if st.button("✨ 预览该段 LLM 改写", key="realtime_preview_btn", type="primary"):
+        with st.spinner("⏳ 预览中..."):
+            preview_result = _preview_single_slot(
+                state, selected_mapping, temperature, max_tokens, use_few_shot
+            )
+            # 存到 session_state 供后续 apply 使用
+            st.session_state["_realtime_preview_result"] = preview_result
+            st.session_state["_realtime_preview_mapping"] = selected_mapping
+
+    # 显示预览结果
+    preview_result = st.session_state.get("_realtime_preview_result")
+    preview_mapping = st.session_state.get("_realtime_preview_mapping")
+
+    if preview_result and preview_mapping is selected_mapping or (
+        preview_result
+        and preview_mapping
+        and preview_mapping.get("template_placeholder") == selected_label
+    ):
+        _display_preview_result(preview_result, preview_mapping, _get_state_mgr(), state)
+
+
+def _get_state_mgr():
+    """从 session_state 取得 PipelineStateManager（单例）。"""
+    from streamlit_app.core.pipeline_state import PipelineStateManager
+    if "_state_mgr" not in st.session_state:
+        st.session_state["_state_mgr"] = PipelineStateManager()
+    return st.session_state["_state_mgr"]
+
+
+def _preview_single_slot(
+    state, mapping: Dict[str, Any], temperature: float, max_tokens: int, use_few_shot: bool
+) -> Dict[str, Any]:
+    """对单个段位执行 LLM 改写（不影响 state.polished_slots）。
+
+    Returns:
+        dict: {
+            "ok": bool,
+            "raw_text": str,
+            "llm_output": str or None,
+            "tokens_used": int,
+            "model_used": str,
+            "is_fallback": bool,
+            "error": str or None,
+            "automation_level": str,
+        }
+    """
+    placeholder = mapping.get("template_placeholder", "unknown")
+
+    try:
+        # 构造 resolver（与批量流程一致）
+        resolver = ReasonResolver(
+            reason_map={"mappings": [mapping], "total_mappings": 1},
+            data=state.raw_data,
+        )
+        from src.collector.reason_collector import ReasonResult
+        reason_results = {
+            sid: ReasonResult(
+                slot=type("S", (), {"slot_id": sid})(),
+                raw_text=info["raw_text"],
+                source_file=info["source_file"],
+                is_empty=info["is_empty"],
+            )
+            for sid, info in state.slot_results.items()
+        }
+        segments = resolver.resolve_all(
+            summary_file=state.summary_path,
+            data=state.raw_data,
+        )
+
+        seg = segments.get(placeholder)
+        if not seg:
+            return {
+                "ok": False,
+                "raw_text": "",
+                "llm_output": None,
+                "tokens_used": 0,
+                "model_used": "",
+                "is_fallback": True,
+                "error": f"resolver 未返回段位 {placeholder}",
+                "automation_level": "MANUAL",
+            }
+
+        return {
+            "ok": True,
+            "raw_text": seg.raw_text,
+            "llm_output": seg.final_text if seg.polished else None,
+            "tokens_used": seg.tokens_used,
+            "model_used": "qwen" if seg.polished else "none",
+            "is_fallback": seg.is_fallback,
+            "error": seg.error,
+            "automation_level": seg.automation_level,
+        }
+    except Exception as e:
+        logger.error("实时预览失败 %s: %s", placeholder, e)
+        return {
+            "ok": False,
+            "raw_text": "",
+            "llm_output": None,
+            "tokens_used": 0,
+            "model_used": "",
+            "is_fallback": True,
+            "error": str(e),
+            "automation_level": "MANUAL",
+        }
+
+
+def _display_preview_result(
+    preview_result: Dict[str, Any], mapping: Dict[str, Any], state_mgr, state
+) -> None:
+    """显示预览结果（原文 vs LLM 输出 diff）。"""
+    placeholder = mapping.get("template_placeholder", "?")
+
+    if not preview_result.get("ok"):
+        st.error(f"❌ 预览失败: {preview_result.get('error', '未知错误')}")
+        return
+
+    is_fallback = preview_result.get("is_fallback", False)
+    llm_output = preview_result.get("llm_output")
+    raw_text = preview_result.get("raw_text", "")
+
+    # 状态徽章
+    col_status, col_meta = st.columns([1, 3])
+    with col_status:
+        if is_fallback:
+            st.markdown("🔄 **Fallback 模式**")
+        elif llm_output:
+            st.markdown("🤖 **LLM 已润色**")
+        else:
+            st.markdown("⏭️ **跳过**")
+    with col_meta:
+        st.caption(
+            f"tokens: {preview_result.get('tokens_used', 0)} | "
+            f"model: {preview_result.get('model_used', 'none')} | "
+            f"自动化: {preview_result.get('automation_level', 'MANUAL')}"
+        )
+
+    # Diff 显示
+    diff_col1, diff_col2 = st.columns(2)
+    with diff_col1:
+        st.markdown("**📄 原文**")
+        if raw_text:
+            st.code(raw_text[:500] + ("..." if len(raw_text) > 500 else ""), language="text")
+        else:
+            st.info("（无原文）")
+    with diff_col2:
+        st.markdown("**✨ LLM 改写**")
+        if llm_output:
+            st.code(llm_output[:500] + ("..." if len(llm_output) > 500 else ""), language="text")
+        elif is_fallback:
+            fallback_text = mapping.get("fallback_text", "（无 fallback_text）")
+            st.code(fallback_text[:500], language="text")
+            st.caption("（这是 fallback 文本，未走 LLM）")
+        else:
+            st.info("（未生成）")
+
+    # 应用到正式结果
+    if llm_output or is_fallback:
+        st.divider()
+        apply_col1, apply_col2 = st.columns([1, 3])
+        with apply_col1:
+            if st.button(
+                "✅ 应用到正式结果",
+                key=f"apply_preview_{placeholder}",
+                type="primary",
+                use_container_width=True,
+            ):
+                if state_mgr is not None:
+                    _apply_preview_to_state(state_mgr, mapping, preview_result)
+                    st.success(f"✅ 已应用 {placeholder}")
+                    st.session_state["_realtime_preview_result"] = None
+                    st.rerun()
+                else:
+                    st.error("❌ state_mgr 不可用，无法应用")
+        with apply_col2:
+            st.caption(
+                "💡 应用后该段位会写入 polished_slots，下一步可继续在 Step 5 编辑"
+            )
+
+
+def _apply_preview_to_state(state_mgr, mapping: Dict[str, Any], preview_result: Dict[str, Any]) -> None:
+    """将预览结果写入 state_mgr.polished_slots。"""
+    placeholder = mapping.get("template_placeholder", "unknown")
+    llm_output = preview_result.get("llm_output")
+    is_fallback = preview_result.get("is_fallback", False)
+    final_text = llm_output if llm_output else mapping.get("fallback_text", "")
+
+    new_slot = PolishedSlot(
+        slot_id=placeholder,
+        placeholder=placeholder,
+        raw_text=preview_result.get("raw_text", ""),
+        llm_output=llm_output,
+        final_text=final_text,
+        is_edited_by_human=False,
+        generation_mode=mapping.get("generation_mode", "extract"),
+        automation_level=preview_result.get("automation_level", "MANUAL"),
+        tokens_used=preview_result.get("tokens_used", 0),
+        model_used=preview_result.get("model_used", ""),
+        is_fallback=is_fallback,
+        error=preview_result.get("error"),
+    )
+
+    # 通过 state_mgr 写入（不可变 dataclass 的官方更新方式）
+    current = state_mgr.get()
+    new_polished = {**current.polished_slots, placeholder: new_slot}
+    state_mgr.update_field(polished_slots=new_polished)
+    logger.info("Realtime preview applied: %s (tokens=%d)", placeholder, preview_result.get("tokens_used", 0))
 
 
 # ============================================================================
@@ -456,6 +759,41 @@ def _render_step_render(state_mgr, state) -> None:
     text_dict = {slot.placeholder: slot.final_text for slot in state.polished_slots.values()}
     st.success(f"✅ 已准备 {len(text_dict)} 个模板变量")
 
+    # === 关键修复：fallback 比例检测 + 按钮禁用 ===
+    total_slots = len(state.polished_slots)
+    fallback_count = sum(1 for s in state.polished_slots.values() if s.is_fallback)
+    fallback_ratio = fallback_count / total_slots if total_slots > 0 else 0
+
+    if fallback_count == total_slots and total_slots > 0:
+        # 100% fallback：按钮禁用
+        st.error(
+            f"❌ **所有 {total_slots} 段都是 fallback 模式**\n\n"
+            "**禁止生成 Word**——报告会非常空洞，几乎无可用信息。\n\n"
+            "**请先**：\n"
+            "1. ⬅️ 返回 Step 1 上传汇总表（最有效）\n"
+            "2. 或返回 Step 5 逐段人工编辑所有段位"
+        )
+        generate_disabled = True
+    elif fallback_ratio > 0.5:
+        # > 50% fallback：警告但允许
+        st.warning(
+            f"⚠️ **{fallback_count}/{total_slots} 段是 fallback 模式**（{fallback_ratio:.0%}）\n\n"
+            "生成的 Word 报告中**过半内容质量较差**。\n\n"
+            "**强烈建议**：先返回 Step 5 人工编辑这些段落，"
+            "再回来生成 Word。\n\n"
+            "（如确认继续，请点击下方按钮）"
+        )
+        generate_disabled = False
+    elif fallback_count > 0:
+        # 少量 fallback：信息提示
+        st.info(
+            f"ℹ️ {fallback_count}/{total_slots} 段是 fallback 模式（{fallback_ratio:.0%}）\n\n"
+            "建议在 Step 5 人工编辑这些段落以提升质量。"
+        )
+        generate_disabled = False
+    else:
+        generate_disabled = False
+
     with st.expander("📋 模板变量预览"):
         for ph, text in list(text_dict.items())[:5]:
             st.code(f"{ph} = {text[:100]}...", language="text")
@@ -469,8 +807,16 @@ def _render_step_render(state_mgr, state) -> None:
         - 输出: `archive/<year>/<week>/<name>.docx`
         """)
     with col2:
-        if st.button("🚀 生成 Word", type="primary", use_container_width=True):
-            _do_render(state_mgr, state, text_dict)
+        if generate_disabled:
+            st.button(
+                "⚠️ 数据不足，建议先补充",
+                disabled=True,
+                use_container_width=True,
+                help=f"所有 {total_slots} 段都是 fallback 模式，请先在 Step 5 人工编辑或返回 Step 1 上传汇总表",
+            )
+        else:
+            if st.button("🚀 生成 Word", type="primary", use_container_width=True):
+                _do_render(state_mgr, state, text_dict)
 
     if state.docx_path:
         st.divider()

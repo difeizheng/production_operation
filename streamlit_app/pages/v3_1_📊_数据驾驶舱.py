@@ -35,6 +35,7 @@ import pandas as pd
 from src.collector.analysis_collector import AnalysisCollector
 from src.collector.summary_collector import SummaryCollector
 from streamlit_app.core import get_state_manager
+from streamlit_app.core.v3_data_adapter import adapt_collector_output
 from streamlit_app.components import (
     render_excel_preview,
     render_kpi_overview,
@@ -49,6 +50,9 @@ def collect_analysis_data(excel_path: Path) -> Optional[Dict[str, Any]]:
     AnalysisCollector.collect() 返回 Tuple[Dict, List[Dict]]：
         (data_dict, errors_list)
     本函数解包后只返回 data_dict（错误信息通过其他渠道显示）。
+
+    v3.2 新增：调用 adapt_collector_output 把采集器输出转换为 UI 标准格式
+              （与演示数据 weekly_report_merged.json 结构一致）
     """
     try:
         collector = AnalysisCollector()
@@ -58,7 +62,11 @@ def collect_analysis_data(excel_path: Path) -> Optional[Dict[str, Any]]:
             data, errors = result
             if errors:
                 st.warning(f"⚠️ 采集时发现 {len(errors)} 个问题（已忽略）")
-            return data
+            # ⭐ v3.2: 把采集器输出转换为 UI 标准格式
+            # 原始输出：domestic.electricity.total（万千瓦时/万元）
+            # UI 标准：group_total.domestic_ongrid_volume_yi_kwh（亿千瓦时/亿元）
+            adapted = adapt_collector_output(data)
+            return adapted
         # 向后兼容：老版本可能直接返回 dict
         return result
     except Exception as e:
