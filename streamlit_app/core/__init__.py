@@ -15,6 +15,27 @@ from streamlit_app.core.pipeline_state import (
     QualityMetrics,
     get_state_manager,
 )
+from streamlit_app.core.quality_metrics import (
+    IndustryTerms,
+    aggregate_overall,
+    check_forbidden,
+    check_length,
+    clear_industry_terms_cache,
+    compute_batch_metrics,
+    compute_deviation,
+    compute_professionalism,
+    compute_slot_metrics,
+    load_industry_terms,
+    validate_numbers,
+)
+from streamlit_app.core.quality_gate import (
+    GateConfig,
+    GateResult,
+    GateVerdict,
+    combine_with_fallback,
+    evaluate,
+    should_block_button,
+)
 from streamlit_app.core.corrections_store import (
     Correction,
     CorrectionsStore,
@@ -56,6 +77,25 @@ __all__ = [
     "PolishedSlot",
     "QualityMetrics",
     "get_state_manager",
+    # quality_metrics
+    "IndustryTerms",
+    "aggregate_overall",
+    "check_forbidden",
+    "check_length",
+    "clear_industry_terms_cache",
+    "compute_batch_metrics",
+    "compute_deviation",
+    "compute_professionalism",
+    "compute_slot_metrics",
+    "load_industry_terms",
+    "validate_numbers",
+    # quality_gate
+    "GateConfig",
+    "GateResult",
+    "GateVerdict",
+    "combine_with_fallback",
+    "evaluate",
+    "should_block_button",
     # corrections_store
     "Correction",
     "CorrectionsStore",

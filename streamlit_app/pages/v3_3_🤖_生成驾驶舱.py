@@ -394,6 +394,13 @@ def _do_polish(state_mgr, state, temperature: float, max_tokens: int, use_few_sh
             )
 
     state_mgr.update_field(polished_slots=polished)
+
+    # === Phase 2: 同步计算质量分（4 重检测）===
+    from streamlit_app.core.quality_metrics import compute_batch_metrics
+    metrics = compute_batch_metrics(polished)
+    state_mgr.update_field(quality_metrics=metrics)
+    logger.info("质量分计算完成: %d 段位", len(metrics))
+
     progress.empty()
     st.success(f"✅ 润色完成: {len(polished)} 个段位")
     st.rerun()
@@ -650,6 +657,11 @@ def _apply_preview_to_state(state_mgr, mapping: Dict[str, Any], preview_result: 
     current = state_mgr.get()
     new_polished = {**current.polished_slots, placeholder: new_slot}
     state_mgr.update_field(polished_slots=new_polished)
+
+    # === Phase 2: 同步重算质量分 ===
+    from streamlit_app.core.quality_metrics import compute_slot_metrics
+    state_mgr.upsert_quality_metric(placeholder, compute_slot_metrics(new_slot))
+
     logger.info("Realtime preview applied: %s (tokens=%d)", placeholder, preview_result.get("tokens_used", 0))
 
 
@@ -728,6 +740,11 @@ def _render_step_edit(state_mgr, state) -> None:
             )
             if updated:
                 state_mgr.upsert_polished_slot(updated)
+
+                # === Phase 2: 人工编辑后重算质量分 ===
+                from streamlit_app.core.quality_metrics import compute_slot_metrics
+                state_mgr.upsert_quality_metric(updated.slot_id, compute_slot_metrics(updated))
+
                 st.rerun()
 
     st.divider()
@@ -794,6 +811,42 @@ def _render_step_render(state_mgr, state) -> None:
     else:
         generate_disabled = False
 
+    # === Phase 2: 质量门禁（叠加在 fallback 门禁之上）===
+    from streamlit_app.core.quality_gate import (
+        evaluate, GateVerdict, should_block_button,
+    )
+    gate_result = evaluate(state)
+    quality_block = should_block_button(gate_result)
+
+    if gate_result.verdict == GateVerdict.PASS:
+        st.success(
+            f"✅ 质量门禁通过：平均 {gate_result.avg_score:.1f} 分"
+        )
+    elif gate_result.verdict == GateVerdict.WARN:
+        st.warning(
+            f"⚠️ 质量门禁警告：平均 {gate_result.avg_score:.1f} 分（阈值 80）\n\n"
+            + "\n".join(f"- {r}" for r in gate_result.reasons)
+        )
+    elif gate_result.verdict == GateVerdict.BLOCK:
+        # BLOCK 允许强制继续
+        st.error(
+            f"❌ 质量门禁阻断：平均 {gate_result.avg_score:.1f} 分（< 60）\n\n"
+            + "\n".join(f"- {r}" for r in gate_result.reasons)
+            + "\n\n**建议**：先返回 Step 5 人工编辑低分段位"
+        )
+    else:  # CRITICAL
+        st.error(
+            f"🚨 质量门禁严重：平均 {gate_result.avg_score:.1f} 分（< 40）\n\n"
+            + "\n".join(f"- {r}" for r in gate_result.reasons)
+            + "\n\n**必须先回 Step 5 编辑**（无法强制继续）"
+        )
+
+    # 合并门禁：fallback OR quality 任一阻断 → 按钮禁用
+    final_disabled = generate_disabled or quality_block
+    force_continue = st.session_state.get("_force_continue_quality", False)
+    if quality_block and gate_result.verdict != GateVerdict.CRITICAL and not force_continue:
+        final_disabled = True  # BLOCK 需要强制
+
     with st.expander("📋 模板变量预览"):
         for ph, text in list(text_dict.items())[:5]:
             st.code(f"{ph} = {text[:100]}...", language="text")
@@ -806,16 +859,47 @@ def _render_step_render(state_mgr, state) -> None:
         - 变量: 所有 ReasonSlot.placeholder → final_text
         - 输出: `archive/<year>/<week>/<name>.docx`
         """)
+
     with col2:
-        if generate_disabled:
-            st.button(
-                "⚠️ 数据不足，建议先补充",
-                disabled=True,
-                use_container_width=True,
-                help=f"所有 {total_slots} 段都是 fallback 模式，请先在 Step 5 人工编辑或返回 Step 1 上传汇总表",
-            )
+        if final_disabled:
+            if gate_result.verdict == GateVerdict.CRITICAL:
+                # CRITICAL：禁止强制
+                st.button(
+                    "🚨 质量严重，禁止生成",
+                    disabled=True,
+                    use_container_width=True,
+                    help=f"质量平均分 {gate_result.avg_score:.1f} < 40，必须先在 Step 5 编辑",
+                )
+            elif quality_block and not force_continue:
+                # BLOCK：允许强制继续
+                st.button(
+                    "⚠️ 质量不达标，建议先编辑",
+                    disabled=True,
+                    use_container_width=True,
+                    help=f"质量平均分 {gate_result.avg_score:.1f} < 60，可强制继续（不推荐）",
+                )
+                if st.button(
+                    "⚠️ 强制继续（忽略质量）",
+                    key="force_continue_quality_btn",
+                    use_container_width=True,
+                ):
+                    st.session_state["_force_continue_quality"] = True
+                    st.rerun()
+            else:
+                # fallback 阻断（100% fallback）
+                st.button(
+                    "⚠️ 数据不足，建议先补充",
+                    disabled=True,
+                    use_container_width=True,
+                    help=f"所有 {total_slots} 段都是 fallback 模式，请先在 Step 5 人工编辑或返回 Step 1 上传汇总表",
+                )
         else:
-            if st.button("🚀 生成 Word", type="primary", use_container_width=True):
+            label = (
+                "🚀 生成 Word（已强制继续）"
+                if force_continue
+                else "🚀 生成 Word"
+            )
+            if st.button(label, type="primary", use_container_width=True):
                 _do_render(state_mgr, state, text_dict)
 
     if state.docx_path:
