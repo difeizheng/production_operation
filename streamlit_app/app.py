@@ -94,6 +94,12 @@ v3_pages = [
         icon="🤖",
         url_path="v3_generate",
     ),
+    st.Page(
+        "pages/v3_4_🎯_质量驾驶舱.py",
+        title="质量驾驶舱",
+        icon="🎯",
+        url_path="v3_quality",
+    ),
 ]
 
 
