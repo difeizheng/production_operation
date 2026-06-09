@@ -100,6 +100,12 @@ v3_pages = [
         icon="🎯",
         url_path="v3_quality",
     ),
+    st.Page(
+        "pages/v3_5_📋_审计驾驶舱.py",
+        title="审计驾驶舱",
+        icon="📋",
+        url_path="v3_audit",
+    ),
 ]
 
 
