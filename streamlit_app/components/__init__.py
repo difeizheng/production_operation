@@ -80,6 +80,21 @@ from .version_badge import (
     render_version_badge,
 )
 
+# v3.2 新增（Phase 2 质量驾驶舱）
+from .quality_radar import (
+    RADAR_CATEGORIES,
+    build_radar_figure,
+    render_quality_radar,
+)
+from .quality_score_table import (
+    build_score_dataframe,
+    render_quality_score_table,
+)
+from .quality_summary import (
+    VERDICT_BADGE,
+    render_quality_summary,
+)
+
 __all__ = [
     # KPI
     "kpi_card",
@@ -138,4 +153,12 @@ __all__ = [
     "render_switch_button",
     "render_v3_title_gradient",
     "render_version_badge",
+    # v3.2 新增（Phase 2 质量驾驶舱）
+    "RADAR_CATEGORIES",
+    "build_radar_figure",
+    "render_quality_radar",
+    "build_score_dataframe",
+    "render_quality_score_table",
+    "VERDICT_BADGE",
+    "render_quality_summary",
 ]
