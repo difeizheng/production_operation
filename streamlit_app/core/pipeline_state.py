@@ -72,7 +72,11 @@ class PolishedSlot:
 
 @dataclass(frozen=True)
 class QualityMetrics:
-    """单个段位的质量指标。"""
+    """单个段位的质量指标。
+
+    4 重检测（数字保留 30 / 长度合理 20 / 禁词扫描 20 / 专业度 20）
+    + 原文偏差 10 = 满 100 分。
+    """
     slot_id: str
     numbers_consistency: bool = True   # 30 分
     length_reasonable: bool = True    # 20 分
@@ -84,6 +88,27 @@ class QualityMetrics:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    @property
+    def passed(self) -> bool:
+        """是否通过（>=80 分）。"""
+        return self.overall_score >= 80
+
+    @property
+    def issues(self) -> List[str]:
+        """问题列表（warnings 的别名）。"""
+        return list(self.warnings)
+
+    @property
+    def score_breakdown(self) -> Dict[str, int]:
+        """分维度分值明细。"""
+        return {
+            "numbers": 30 if self.numbers_consistency else 0,
+            "length": 20 if self.length_reasonable else 0,
+            "forbidden": 20 if self.no_forbidden_words else 0,
+            "professionalism": self.professionalism,
+            "deviation": int(round(self.original_deviation * 10)),
+        }
 
 
 @dataclass(frozen=True)
@@ -212,6 +237,60 @@ class PipelineStateManager:
             polished_slots=new_polished,
         )
         logger.info("Human edit recorded: slot=%s, len=%d", slot_id, len(edited_text))
+
+    def upsert_quality_metric(self, slot_id: str, metric: QualityMetrics) -> None:
+        """插入或更新单个 QualityMetrics。
+
+        用法：
+            manager.upsert_quality_metric(slot.slot_id, compute_slot_metrics(slot))
+        """
+        current = self.get()
+        new_metrics = {**current.quality_metrics, slot_id: metric}
+        self.update_field(quality_metrics=new_metrics)
+        logger.debug(
+            "Quality metric updated: slot=%s, score=%d",
+            slot_id, metric.overall_score,
+        )
+
+    def aggregate_quality(self) -> Dict[str, Any]:
+        """汇总当前所有 QualityMetrics 的统计信息。
+
+        返回：
+            avg_score, pass_rate, min_score, max_score, count
+            fallback_ratio: fallback 段位比例
+            blocked_count: BLOCK 段位数（<60）
+            warning_count: WARN 段位数（<80）
+        """
+        state = self.get()
+        metrics = state.quality_metrics
+        slots = state.polished_slots
+
+        if not metrics:
+            return {
+                "avg_score": 0.0,
+                "pass_rate": 0.0,
+                "min_score": 0,
+                "max_score": 0,
+                "count": 0,
+                "fallback_ratio": 0.0,
+                "blocked_count": 0,
+                "warning_count": 0,
+            }
+
+        scores = [m.overall_score for m in metrics.values()]
+        total = len(state.polished_slots)
+        fallback_count = sum(1 for s in slots.values() if s.is_fallback)
+
+        return {
+            "avg_score": round(sum(scores) / len(scores), 1),
+            "pass_rate": round(sum(1 for s in scores if s >= 80) / len(scores), 3),
+            "min_score": min(scores),
+            "max_score": max(scores),
+            "count": len(scores),
+            "fallback_ratio": round(fallback_count / total, 3) if total > 0 else 0.0,
+            "blocked_count": sum(1 for s in scores if s < 60),
+            "warning_count": sum(1 for s in scores if 60 <= s < 80),
+        }
 
     # ========================================================================
     # 快照
