@@ -21,12 +21,14 @@ import streamlit as st
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# === Streamlit 页面配置（必须在第一个 st 命令前） ===
-st.set_page_config(
+# === 关键：safe_set_page_config 必须在第一个 st 命令之前导入 ===
+from streamlit_app.core.safe_page_config import safe_set_page_config
+
+# === 页面配置 ===
+safe_set_page_config(
     page_title="质量驾驶舱 - 周报 v3.0",
     page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
 logger = logging.getLogger(__name__)
