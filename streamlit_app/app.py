@@ -78,15 +78,9 @@ home = st.Page(
 v3_pages = [
     st.Page(
         "pages/v3_1_📊_数据驾驶舱.py",
-        title="数据驾驶舱",
+        title="报告沙盘",
         icon="📊",
-        url_path="v3_data",
-    ),
-    st.Page(
-        "pages/v3_2_🧩_映射驾驶舱.py",
-        title="映射驾驶舱",
-        icon="🧩",
-        url_path="v3_mapping",
+        url_path="v3_sandbox",
     ),
     st.Page(
         "pages/v3_3_🤖_生成驾驶舱.py",

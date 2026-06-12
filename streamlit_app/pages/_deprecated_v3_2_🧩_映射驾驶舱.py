@@ -34,6 +34,8 @@ safe_set_page_config(
 # === 导入 ===
 from streamlit_app.core import get_state_manager
 from streamlit_app.components import render_pipeline_stepper
+from src.collector.trace_builder import build_trace_report, build_paragraph_traces
+from streamlit_app.components.paragraph_trace import render_paragraph_trace
 
 
 # === 加载 reason_map.json ===
@@ -176,6 +178,26 @@ for i, m in enumerate(filtered, 1):
                 # 仅在内存中更新（避免修改源文件）
                 m["fallback_text"] = new_fallback
                 st.success("✅ Fallback 已更新（仅本次会话）")
+
+st.divider()
+
+# === 段落溯源视图（v3.4 新增）===
+st.subheader("2.5️⃣ 段落溯源视图")
+st.caption("按报告段落分组，展示数据拼装逻辑（数字字段 + 原因文本）")
+
+trace_report = build_trace_report(state.raw_data)
+paragraph_traces = build_paragraph_traces(reason_map, trace_report, state.raw_data)
+render_paragraph_trace(paragraph_traces, trace_report)
+
+st.divider()
+
+# === 段落溯源视图（v3.4 新增）===
+st.subheader("2.5️⃣ 段落溯源视图")
+st.caption("按报告段落分组，展示数据拼装逻辑（数字字段 + 原因文本）")
+
+trace_report = build_trace_report(state.raw_data)
+paragraph_traces = build_paragraph_traces(reason_map, trace_report, state.raw_data)
+render_paragraph_trace(paragraph_traces, trace_report)
 
 st.divider()
 

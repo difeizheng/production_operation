@@ -20,6 +20,9 @@ v3.0 新增（人机协同驾驶舱）:
 
 v3.1 新增（v2/v3 路由）:
 - version_badge: 视觉徽章 + 跨版本跳转
+
+v3.4 新增（数据溯源可视化）:
+- trace_table: 数据溯源表格（CELL_MAP 字段 → 单元格 → 值 → 验证）
 """
 
 __version__ = "3.1.0-phase1"
@@ -112,6 +115,24 @@ from .edit_history import (
     render_edit_diff,
 )
 
+# v3.4 新增（数据溯源可视化）
+from .trace_table import (
+    render_trace_table,
+)
+
+# v3.5 新增（报告沙盘）
+from .trust_score import (
+    TrustScoreResult,
+    compute_trust_score,
+    render_trust_score_bar,
+)
+from .report_sandbox import (
+    build_field_to_paragraphs,
+    detect_action_items,
+    render_action_items,
+    render_report_sandbox,
+)
+
 __all__ = [
     # KPI
     "kpi_card",
@@ -190,4 +211,14 @@ __all__ = [
     "compute_edit_chain",
     "render_diff_block",
     "render_edit_diff",
+    # v3.4 新增（数据溯源可视化）
+    "render_trace_table",
+    # v3.5 新增（报告沙盘）
+    "TrustScoreResult",
+    "compute_trust_score",
+    "render_trust_score_bar",
+    "build_field_to_paragraphs",
+    "detect_action_items",
+    "render_action_items",
+    "render_report_sandbox",
 ]
